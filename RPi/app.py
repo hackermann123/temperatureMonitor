@@ -726,6 +726,20 @@ def enable_mock_mode():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/mock/disable', methods=['POST'])
+def disable_mock_mode():
+    """Disable mock mode - switch back to Arduino"""
+    global serial_handler, data_manager
+    try:
+        serial_handler.use_mock = False
+        # Clear old mock sensors from memory
+        data_manager.sensors.clear()
+        print("[MOCK] Mock mode DISABLED - waiting for Arduino connection")
+        return jsonify({"status": "ok", "message": "Mock mode disabled"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/system/status', methods=['GET'])
 def system_status():
     """Get system status"""

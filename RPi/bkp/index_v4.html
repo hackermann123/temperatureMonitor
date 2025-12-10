@@ -362,15 +362,6 @@
             color: #666;
             margin: 8px 0 0 0;
         }
-
-        .disable-mock-btn {
-            background: #fed7d7 !important;
-            color: #742a2a !important;
-        }
-
-        .disable-mock-btn:hover {
-            background: #fecaca !important;
-        }
     </style>
 </head>
 <body>
@@ -398,20 +389,12 @@
                     <span id="statusText">Connecting...</span>
                 </div>
                 
-                <!-- Mock Mode Button - Show when no sensors -->
+                <!-- Mock Mode Button -->
                 <div id="mockModeSection" style="display: none;" class="mock-mode-section">
                     <button class="btn-secondary" onclick="enableMockMode()">
                         🎮 Enable Mock Mode (Testing)
                     </button>
                     <p>No Arduino detected. Enable mock mode to test with simulated sensors.</p>
-                </div>
-
-                <!-- Disable Mock Mode Button - Show when mock is active -->
-                <div id="disableMockSection" style="display: none;" class="mock-mode-section">
-                    <button class="btn-secondary disable-mock-btn" onclick="disableMockMode()">
-                        ⏹️ Disable Mock Mode
-                    </button>
-                    <p>Mock mode is active. Disable to switch back to Arduino mode.</p>
                 </div>
             </div>
 
@@ -578,40 +561,21 @@
             }
         }
 
-        async function disableMockMode() {
-            try {
-                const response = await fetch('/api/mock/disable', { method: 'POST' });
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showStatus('Mock mode disabled. Waiting for Arduino...', 'info');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showStatus('Error disabling mock mode: ' + result.error, 'error');
-                }
-            } catch (err) {
-                showStatus('Error: ' + err.message, 'error');
-            }
-        }
-
         function updateDashboard() {
             fetch('/api/sensors')
                 .then(r => r.json())
                 .then(data => {
                     const sensors = data.sensors || {};
                     const grid = document.getElementById('sensorGrid');
-                    const mockModeSection = document.getElementById('mockModeSection');
-                    const disableMockSection = document.getElementById('disableMockSection');
+                    const mockSection = document.getElementById('mockModeSection');
 
                     if (Object.keys(sensors).length === 0) {
                         grid.innerHTML = '<div class="loading"><p>No sensors detected. Check Arduino connection.</p></div>';
-                        mockModeSection.style.display = 'block';
-                        disableMockSection.style.display = 'none';
+                        mockSection.style.display = 'block';
                         return;
                     }
                     
-                    mockModeSection.style.display = 'none';
-                    disableMockSection.style.display = 'block';
+                    mockSection.style.display = 'none';
 
                     grid.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
                         <div class="sensor-card ${sensor.status === 'offline' ? 'offline' : ''}">
