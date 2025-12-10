@@ -736,12 +736,12 @@
         }
 
         function createChart(readings, timestamps) {
-            const ctx = document.getElementById('temperatureChart').getContext('2d');
-            
-            // Destroy old chart
+            const canvas=document.getElementById('temperatureChart');
             if (temperatureChart) {
                 temperatureChart.destroy();
+                temperatureChart = null;
             }
+            const ctx = canvas.getContext('2d');
 
             const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140'];
             const datasets = [];
