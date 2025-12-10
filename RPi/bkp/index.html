@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Monitoring Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --color-primary: #2180a4;
+            --color-primary-hover: #1c6b8c;
+            --color-bg: #f5f5f5;
+            --color-surface: #ffffff;
+            --color-text: #1a1a1a;
+            --color-text-light: #666;
+            --color-border: #e0e0e0;
+            --color-success: #22c55e;
+            --color-error: #ef4444;
+            --color-warning: #f59e0b;
+            --color-offline: #9ca3af;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: var(--color-surface);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            border-radius: 6px;
+            background: var(--color-success);
+            color: white;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .status-indicator.offline {
+            background: var(--color-offline);
+        }
+
+        .status-indicator.error {
+            background: var(--color-error);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: white;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--color-border);
+        }
+
+        .tab-button {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--color-text-light);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-button.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-primary);
+        }
+
+        .tab-button:hover {
+            color: var(--color-primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Dashboard Tab */
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .sensor-card {
+            background: var(--color-surface);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .sensor-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .sensor-card.offline {
+            opacity: 0.7;
+            border-left: 4px solid var(--color-offline);
+        }
+
+        .sensor-card.online {
+            border-left: 4px solid var(--color-success);
+        }
+
+        .sensor-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sensor-id {
+            font-size: 12px;
+            color: var(--color-text-light);
+            font-family: monospace;
+        }
+
+        .sensor-temp {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin: 15px 0;
+        }
+
+        .sensor-temp.offline {
+            color: var(--color-offline);
+        }
+
+        .sensor-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            background: var(--color-success);
+            color: white;
+        }
+
+        .sensor-status.offline {
+            background: var(--color-offline);
+        }
+
+        /* Logging Section */
+        .logging-panel {
+            background: var(--color-surface);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .logging-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--color-text);
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            padding: 10px;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            color: var(--color-text);
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(33, 128, 164, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--color-primary-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary:disabled {
+            background: var(--color-offline);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--color-border);
+            color: var(--color-text);
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-danger {
+            background: var(--color-error);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .logging-status {
+            padding: 15px;
+            border-radius: 4px;
+            background: var(--color-warning);
+            color: white;
+            font-weight: 500;
+            display: none;
+            margin-bottom: 15px;
+        }
+
+        .logging-status.active {
+            display: block;
+        }
+
+        /* Probe Management Tab */
+        .probe-list {
+            background: var(--color-surface);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .probe-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .probe-item:last-child {
+            border-bottom: none;
+        }
+
+        .probe-info {
+            flex: 1;
+        }
+
+        .probe-address {
+            font-family: monospace;
+            font-size: 12px;
+            color: var(--color-text-light);
+            margin-top: 4px;
+        }
+
+        .probe-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input.probe-name {
+            max-width: 150px;
+            padding: 6px 10px;
+            font-size: 14px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* Graph Tab */
+        .graph-container {
+            background: var(--color-surface);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        /* Error/Success Messages */
+        .message {
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+            animation: slideIn 0.3s;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid var(--color-success);
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #7f1d1d;
+            border-left: 4px solid var(--color-error);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .manage-probes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--color-text-light);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>🌡️ Temperature Monitoring</h1>
+                <p style="font-size: 14px; color: var(--color-text-light); margin-top: 5px;">Connected Sensors: <span id="sensorCount">0</span></p>
+            </div>
+            <div class="status-indicator" id="statusIndicator">
+                <div class="status-dot"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-button active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-button" data-tab="logging">Data Logging</button>
+            <button class="tab-button" data-tab="probes">Manage Probes</button>
+            <button class="tab-button" data-tab="graphs">Historical Graphs</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div id="sensorContainer" class="sensor-grid"></div>
+        </div>
+
+        <!-- Logging Tab -->
+        <div id="logging" class="tab-content">
+            <div class="logging-panel">
+                <h2 style="margin-bottom: 20px;">Data Logging Configuration</h2>
+                
+                <div id="loggingMessage" class="message"></div>
+
+                <div class="logging-status" id="loggingStatus">
+                    <span class="spinner"></span><span id="loggingStatusText">Logging active...</span>
+                </div>
+
+                <div class="logging-controls">
+                    <div class="control-group">
+                        <label for="logFolder">Log Folder Path</label>
+                        <input type="text" id="logFolder" placeholder="/home/pi/temperature_logs/" value="/home/pi/temperature_logs/">
+                        <p class="help-text">Default folder for saving CSV files</p>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="logDuration">Recording Duration (minutes)</label>
+                        <input type="number" id="logDuration" placeholder="10" value="10" min="1">
+                        <p class="help-text">Leave empty for indefinite</p>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="logInterval">Sample Interval (seconds)</label>
+                        <input type="number" id="logInterval" placeholder="60" value="60" min="1">
+                        <p class="help-text">How often to record readings</p>
+                    </div>
+                </div>
+
+                <div class="button-group" style="margin-top: 20px;">
+                    <button class="btn-primary" id="startLoggingBtn" onclick="startLogging()">Start Logging</button>
+                    <button class="btn-danger" id="stopLoggingBtn" onclick="stopLogging()" disabled>Stop Logging</button>
+                </div>
+
+                <div style="margin-top: 30px; padding: 15px; background: #f9fafb; border-radius: 4px; border-left: 4px solid var(--color-primary);">
+                    <h3 style="margin-bottom: 10px; font-size: 14px;">Logging Info</h3>
+                    <p id="loggingInfo" style="font-size: 14px; color: var(--color-text-light);"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Probe Management Tab -->
+        <div id="probes" class="tab-content">
+            <div class="manage-probes-header">
+                <h2>Connected Probes</h2>
+                <button class="btn-primary btn-small" onclick="rescanProbes()">🔄 Rescan Probes</button>
+            </div>
+            <div class="probe-list" id="probeList"></div>
+        </div>
+
+        <!-- Graphs Tab -->
+        <div id="graphs" class="tab-content">
+            <h2 style="margin-bottom: 20px;">Historical Temperature Data</h2>
+            <div class="graph-container">
+                <div class="chart-wrapper">
+                    <canvas id="temperatureChart"></canvas>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-secondary" onclick="loadGraphData()">Refresh Data</button>
+                    <button class="btn-secondary" onclick="downloadGraphCSV()">Download CSV</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        const state = {
+            sensors: {},
+            isLogging: false,
+            loggingSession: null,
+            connectionStatus: 'disconnected',
+            currentTab: 'dashboard',
+            chart: null
+        };
+
+        // Configuration
+        const config = {
+            updateInterval: 500,
+            rescanInterval: 10000
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupTabButtons();
+            startConnectionMonitor();
+            setInterval(updateDashboard, config.updateInterval);
+        });
+
+        // Tab Navigation
+        function setupTabButtons() {
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const tabName = e.target.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+        }
+
+        function switchTab(tabName) {
+            state.currentTab = tabName;
+            
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.tab === tabName) btn.classList.add('active');
+            });
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+
+            if (tabName === 'graphs') {
+                loadGraphData();
+            }
+        }
+
+        // Connection and Data Polling
+        function startConnectionMonitor() {
+            setInterval(fetchSensorData, config.updateInterval);
+        }
+
+        async function fetchSensorData() {
+            try {
+                const response = await fetch('/api/sensors');
+                if (!response.ok) throw new Error('Failed to fetch');
+
+                const data = await response.json();
+                state.sensors = data.sensors || {};
+                state.connectionStatus = 'connected';
+                updateConnectionStatus();
+            } catch (error) {
+                state.connectionStatus = 'disconnected';
+                updateConnectionStatus();
+            }
+        }
+
+        function updateConnectionStatus() {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            
+            indicator.classList.remove('offline', 'error');
+            if (state.connectionStatus === 'connected') {
+                indicator.classList.add('online');
+                text.textContent = '🟢 Connected';
+            } else if (state.connectionStatus === 'error') {
+                indicator.classList.add('error');
+                text.textContent = '🔴 Serial Error';
+            } else {
+                indicator.classList.add('offline');
+                text.textContent = '⚪ Disconnected';
+            }
+        }
+
+        // Dashboard Updates
+        function updateDashboard() {
+            updateSensorCount();
+            renderSensorCards();
+        }
+
+        function updateSensorCount() {
+            const count = Object.keys(state.sensors).length;
+            document.getElementById('sensorCount').textContent = count;
+        }
+
+        function renderSensorCards() {
+            const container = document.getElementById('sensorContainer');
+            
+            if (Object.keys(state.sensors).length === 0) {
+                container.innerHTML = '<p style="grid-column: 1/-1; color: var(--color-text-light);">No sensors connected. Check Arduino connection.</p>';
+                return;
+            }
+
+            container.innerHTML = Object.entries(state.sensors).map(([id, sensor]) => `
+                <div class="sensor-card ${sensor.status === 'online' ? 'online' : 'offline'}">
+                    <div class="sensor-name">
+                        <span>${sensor.name || 'Sensor ' + id.slice(0, 8)}</span>
+                        <span class="sensor-status ${sensor.status === 'offline' ? 'offline' : ''}">${sensor.status.toUpperCase()}</span>
+                    </div>
+                    <div class="sensor-id">${id}</div>
+                    <div class="sensor-temp ${sensor.status === 'offline' ? 'offline' : ''}">
+                        ${sensor.status === 'online' ? sensor.temperature.toFixed(2) : 'NC'}°C
+                    </div>
+                    <p style="font-size: 12px; color: var(--color-text-light); margin: 0;">
+                        Last update: ${new Date(sensor.lastUpdate * 1000).toLocaleTimeString()}
+                    </p>
+                </div>
+            `).join('');
+        }
+
+        // Logging Functions
+        async function startLogging() {
+            const folder = document.getElementById('logFolder').value || '/home/pi/temperature_logs/';
+            const duration = document.getElementById('logDuration').value || null;
+            const interval = document.getElementById('logInterval').value || 60;
+
+            try {
+                const response = await fetch('/api/logging/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        folder: folder,
+                        duration: duration ? parseInt(duration) * 60 : null,
+                        interval: parseInt(interval)
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    state.isLogging = true;
+                    state.loggingSession = data;
+                    updateLoggingUI();
+                    showMessage('Logging started successfully!', 'success');
+                } else {
+                    showMessage(data.error || 'Failed to start logging', 'error');
+                }
+            } catch (error) {
+                showMessage('Error starting logging: ' + error.message, 'error');
+            }
+        }
+
+        async function stopLogging() {
+            try {
+                const response = await fetch('/api/logging/stop', { method: 'POST' });
+                const data = await response.json();
+
+                if (response.ok) {
+                    state.isLogging = false;
+                    state.loggingSession = null;
+                    updateLoggingUI();
+                    showMessage('Logging stopped. File: ' + data.filename, 'success');
+                } else {
+                    showMessage(data.error || 'Failed to stop logging', 'error');
+                }
+            } catch (error) {
+                showMessage('Error stopping logging: ' + error.message, 'error');
+            }
+        }
+
+        function updateLoggingUI() {
+            const statusDiv = document.getElementById('loggingStatus');
+            const startBtn = document.getElementById('startLoggingBtn');
+            const stopBtn = document.getElementById('stopLoggingBtn');
+            const infoDiv = document.getElementById('loggingInfo');
+
+            if (state.isLogging) {
+                statusDiv.classList.add('active');
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                const elapsed = Math.floor((Date.now() - state.loggingSession.startTime) / 1000);
+                infoDiv.innerHTML = `
+                    <strong>Session File:</strong> ${state.loggingSession.filename}<br>
+                    <strong>Elapsed:</strong> ${formatTime(elapsed)}<br>
+                    <strong>Sampling Interval:</strong> ${state.loggingSession.interval}s<br>
+                    <strong>Total Duration:</strong> ${state.loggingSession.duration ? formatTime(state.loggingSession.duration) : 'Indefinite'}
+                `;
+            } else {
+                statusDiv.classList.remove('active');
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                infoDiv.textContent = 'No active logging session';
+            }
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}m ${secs}s`;
+        }
+
+        // Probe Management
+        async function rescanProbes() {
+            try {
+                const response = await fetch('/api/probes/rescan', { method: 'POST' });
+                const data = await response.json();
+                showMessage(`Rescan initiated. Found ${Object.keys(data.sensors).length} probes.`, 'success');
+                await fetchSensorData();
+            } catch (error) {
+                showMessage('Error rescanning probes: ' + error.message, 'error');
+            }
+        }
+
+        async function renameProbe(sensorId, newName) {
+            try {
+                const response = await fetch('/api/probes/rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sensor_id: sensorId, name: newName })
+                });
+                
+                if (response.ok) {
+                    state.sensors[sensorId].name = newName;
+                    renderProbeList();
+                }
+            } catch (error) {
+                console.error('Error renaming probe:', error);
+            }
+        }
+
+        function renderProbeList() {
+            const list = document.getElementById('probeList');
+            
+            if (Object.keys(state.sensors).length === 0) {
+                list.innerHTML = '<p style="padding: 20px; color: var(--color-text-light);">No probes detected</p>';
+                return;
+            }
+
+            list.innerHTML = Object.entries(state.sensors).map(([id, sensor]) => `
+                <div class="probe-item">
+                    <div class="probe-info">
+                        <input type="text" class="probe-name" value="${sensor.name || ''}" 
+                               onblur="renameProbe('${id}', this.value)"
+                               onkeypress="if(event.key==='Enter') renameProbe('${id}', this.value)">
+                        <div class="probe-address">${id}</div>
+                    </div>
+                    <div class="probe-actions">
+                        <span style="padding: 6px 12px; background: #f3f4f6; border-radius: 4px; font-size: 12px;">
+                            ${sensor.status === 'online' ? '✓ Online' : '✗ Offline'}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Graph Functions
+        async function loadGraphData() {
+            try {
+                const response = await fetch('/api/graphs/data');
+                const data = await response.json();
+                renderChart(data);
+            } catch (error) {
+                console.error('Error loading graph data:', error);
+            }
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('temperatureChart');
+            
+            if (state.chart) {
+                state.chart.destroy();
+            }
+
+            const datasets = Object.entries(data.sessions || {}).map((entry, idx) => {
+                const colors = ['#2180a4', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#ec4899'];
+                const color = colors[idx % colors.length];
+                return {
+                    label: entry[0],
+                    data: entry[1].map(d => ({ x: new Date(d.timestamp * 1000), y: d.temperature })),
+                    borderColor: color,
+                    backgroundColor: color + '20',
+                    tension: 0.3,
+                    fill: false
+                };
+            });
+
+            state.chart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: 'Temperature History' }
+                    },
+                    scales: {
+                        x: { type: 'time', time: { unit: 'minute' } },
+                        y: { title: { display: true, text: 'Temperature (°C)' } }
+                    }
+                }
+            });
+        }
+
+        function downloadGraphCSV() {
+            window.location.href = '/api/graphs/download';
+        }
+
+        // Utility Functions
+        function showMessage(text, type) {
+            const msg = document.getElementById('loggingMessage');
+            msg.textContent = text;
+            msg.className = `message ${type} show`;
+            setTimeout(() => msg.classList.remove('show'), 4000);
+        }
+
+        // Update logging UI every second
+        setInterval(() => {
+            if (state.isLogging) {
+                updateLoggingUI();
+                renderProbeList();
+            }
+        }, 1000);
+
+        // Initial render
+        renderProbeList();
+    </script>
+</body>
+</html>
