@@ -1,5 +1,6 @@
-# Temperature Monitoring System - Flask Backend (v2 - GRAPHS FIXED)
-# Complete working version with all fixes
+# Temperature Monitoring System - Flask Backend (FIXED)
+# Author: Your Name
+# Description: Multi-probe temperature logging system with state machine
 
 import os
 import json
@@ -10,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from enum import Enum
 from queue import Queue
-from flask import Flask, render_template, jsonify, request, send_file
+from flask import Flask, render_template, jsonify, request
 from functools import wraps
 
 # ============================================================================
@@ -145,6 +146,7 @@ class SerialHandler:
             sensors.append(f"{sensor_id}:{temp:.2f}")
         
         data = ",".join(sensors)
+        print(f"[MOCK] Generated: {data}")
         time.sleep(0.5)  # Simulate read delay
         return data
     
@@ -313,18 +315,15 @@ class DataLogger:
         try:
             filepath = self.folder / filename
             if not filepath.exists():
-                print(f"[LOGGER] File not found: {filepath}")
                 return None
             
             data = []
             with open(filepath, 'r') as f:
                 lines = f.readlines()
                 if not lines:
-                    print(f"[LOGGER] Empty file: {filename}")
                     return None
                 
                 headers = lines[0].strip().split(',')[1:]  # Skip timestamp
-                print(f"[LOGGER] Loaded headers from {filename}: {headers}")
                 
                 for line in lines[1:]:
                     values = line.strip().split(',')
@@ -333,24 +332,15 @@ class DataLogger:
                         readings = {}
                         for i, header in enumerate(headers):
                             try:
-                                val = values[i + 1]
-                                if val == "NC":
-                                    readings[header] = None
-                                else:
-                                    readings[header] = float(val)
+                                readings[header] = float(values[i + 1])
                             except (ValueError, IndexError):
                                 readings[header] = None
                         data.append({"timestamp": timestamp, "readings": readings})
             
-            print(f"[LOGGER] Loaded {len(data)} rows from {filename}")
             return data
         except Exception as e:
-            print(f"[LOGGER] Error loading session {filename}: {e}")
+            print(f"[LOGGER] Error loading session: {e}")
             return None
-    
-    def get_log_folder(self):
-        """Get the logging folder path"""
-        return str(self.folder)
 
 # ============================================================================
 # SERIAL READER THREAD
@@ -511,7 +501,6 @@ logging_thread = None
 MOCK_MODE = True  # Set to False for real Arduino
 SERIAL_PORT = "/dev/ttyACM0"
 SERIAL_BAUDRATE = 9600
-LOG_FOLDER = "/home/pi/temperature_logs/"
 
 # ============================================================================
 # ROUTES - API ENDPOINTS
@@ -562,7 +551,7 @@ def start_logging():
         return jsonify({"error": "System not ready for logging"}), 400
     
     data = request.get_json()
-    folder = data.get('folder', LOG_FOLDER)
+    folder = data.get('folder', '/home/pi/temperature_logs/')
     duration = data.get('duration')  # seconds
     interval = data.get('interval', 60)  # seconds
     
@@ -627,71 +616,35 @@ def stop_logging():
 
 @app.route('/api/graphs/data', methods=['GET'])
 def get_graph_data():
-    """Get historical graph data - FIXED VERSION"""
+    """Get historical graph data"""
     try:
         # List all CSV files in logs folder
-        log_folder = Path(LOG_FOLDER)
-        
-        # Create folder if it doesn't exist
-        log_folder.mkdir(parents=True, exist_ok=True)
-        
-        # Find all CSV files
+        log_folder = Path("/home/pi/temperature_logs/")
+        if not log_folder.exists():
+            return jsonify({"sessions": {}})
+            
         csv_files = sorted(log_folder.glob("temperature_log_*.csv"))
         
-        print(f"[GRAPHS] Found {len(csv_files)} CSV files in {log_folder}")
-        
-        if not csv_files:
-            print("[GRAPHS] No CSV files found")
-            return jsonify({"sessions": {}})
-        
         sessions = {}
+        for csv_file in csv_files[-5:]:  # Last 5 sessions
+            data = logger.load_session_data(csv_file.name)
+            if data:
+                sessions[csv_file.name] = data
         
-        # Load last 10 sessions
-        for csv_file in csv_files[-10:]:
-            print(f"[GRAPHS] Loading: {csv_file.name}")
-            
-            # Load data directly from file
-            try:
-                data = []
-                with open(csv_file, 'r') as f:
-                    lines = f.readlines()
-                    if lines:
-                        headers = lines[0].strip().split(',')[1:]  # Skip timestamp
-                        
-                        for line in lines[1:]:
-                            values = line.strip().split(',')
-                            if len(values) > 1:
-                                timestamp = values[0]
-                                readings = {}
-                                for i, header in enumerate(headers):
-                                    try:
-                                        val = values[i + 1]
-                                        readings[header] = float(val) if val != "NC" else None
-                                    except (ValueError, IndexError):
-                                        readings[header] = None
-                                data.append({"timestamp": timestamp, "readings": readings})
-                
-                if data:
-                    sessions[csv_file.name] = data
-                    print(f"[GRAPHS] Loaded {len(data)} rows from {csv_file.name}")
-            
-            except Exception as e:
-                print(f"[GRAPHS] Error loading {csv_file.name}: {e}")
-        
-        print(f"[GRAPHS] Returning {len(sessions)} sessions")
         return jsonify({"sessions": sessions})
-        
     except Exception as e:
-        print(f"[GRAPHS] Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/graphs/download', methods=['GET'])
 def download_graph_csv():
     """Download historical data as CSV"""
     try:
-        log_folder = Path(LOG_FOLDER)
-        log_folder.mkdir(parents=True, exist_ok=True)
+        from flask import send_file
         
+        log_folder = Path("/home/pi/temperature_logs/")
+        if not log_folder.exists():
+            return jsonify({"error": "No data available"}), 404
+            
         csv_files = sorted(log_folder.glob("temperature_log_*.csv"))
         
         if not csv_files:
@@ -704,7 +657,7 @@ def download_graph_csv():
                 with open(csv_file, 'r') as infile:
                     outfile.write(infile.read())
         
-        return send_file(combined_file, as_attachment=True, download_name="temperature_data.csv")
+        return send_file(combined_file, as_attachment=True)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -726,10 +679,6 @@ def system_status():
 def startup_sequence():
     """Initialize system on startup"""
     print("[STARTUP] Initializing Temperature Monitoring System")
-    print(f"[STARTUP] Log folder: {LOG_FOLDER}")
-    
-    # Ensure log folder exists
-    Path(LOG_FOLDER).mkdir(parents=True, exist_ok=True)
     
     # Start serial reader thread
     reader = SerialReaderThread(serial_handler, data_manager, state_machine, logger)
