@@ -1,5 +1,5 @@
-# Temperature Monitoring System - Flask Backend (v3 - PER-FILE GRAPHS)
-# Complete working version with single-file graph selection
+# Temperature Monitoring System - Flask Backend (v2 - GRAPHS FIXED)
+# Complete working version with all fixes
 
 import os
 import json
@@ -627,62 +627,60 @@ def stop_logging():
 
 @app.route('/api/graphs/data', methods=['GET'])
 def get_graph_data():
-    """Get historical graph data - single file or list all files."""
+    """Get historical graph data - FIXED VERSION"""
     try:
+        # List all CSV files in logs folder
         log_folder = Path(LOG_FOLDER)
+        
+        # Create folder if it doesn't exist
         log_folder.mkdir(parents=True, exist_ok=True)
-
-        # Optional ?file=temperature_log_YYYY-MM-DD_HH-MM-SS.csv
-        requested_file = request.args.get('file')
-
+        
+        # Find all CSV files
         csv_files = sorted(log_folder.glob("temperature_log_*.csv"))
+        
         print(f"[GRAPHS] Found {len(csv_files)} CSV files in {log_folder}")
-
+        
         if not csv_files:
-            return jsonify({"sessions": {}, "files": []})
-
-        files_list = [f.name for f in csv_files]
-
-        # If a specific file is requested, restrict to that
-        if requested_file:
-            requested_path = log_folder / requested_file
-            if requested_path.exists():
-                csv_files = [requested_path]
-            else:
-                csv_files = []
-
+            print("[GRAPHS] No CSV files found")
+            return jsonify({"sessions": {}})
+        
         sessions = {}
-
-        for csv_file in csv_files:
+        
+        # Load last 10 sessions
+        for csv_file in csv_files[-10:]:
             print(f"[GRAPHS] Loading: {csv_file.name}")
-            data = []
+            
+            # Load data directly from file
             try:
-                with open(csv_file, "r") as f:
+                data = []
+                with open(csv_file, 'r') as f:
                     lines = f.readlines()
-                    if not lines:
-                        continue
-                    headers = lines[0].strip().split(",")[1:]
-                    for line in lines[1:]:
-                        values = line.strip().split(",")
-                        if len(values) > 1:
-                            timestamp = values[0]
-                            readings = {}
-                            for i, header in enumerate(headers):
-                                try:
-                                    val = values[i + 1]
-                                    readings[header] = float(val) if val != "NC" else None
-                                except (ValueError, IndexError):
-                                    readings[header] = None
-                            data.append({"timestamp": timestamp, "readings": readings})
+                    if lines:
+                        headers = lines[0].strip().split(',')[1:]  # Skip timestamp
+                        
+                        for line in lines[1:]:
+                            values = line.strip().split(',')
+                            if len(values) > 1:
+                                timestamp = values[0]
+                                readings = {}
+                                for i, header in enumerate(headers):
+                                    try:
+                                        val = values[i + 1]
+                                        readings[header] = float(val) if val != "NC" else None
+                                    except (ValueError, IndexError):
+                                        readings[header] = None
+                                data.append({"timestamp": timestamp, "readings": readings})
+                
                 if data:
                     sessions[csv_file.name] = data
                     print(f"[GRAPHS] Loaded {len(data)} rows from {csv_file.name}")
+            
             except Exception as e:
                 print(f"[GRAPHS] Error loading {csv_file.name}: {e}")
-
-        print(f"[GRAPHS] Returning {len(sessions)} sessions, total files: {len(files_list)}")
-        return jsonify({"sessions": sessions, "files": files_list})
-
+        
+        print(f"[GRAPHS] Returning {len(sessions)} sessions")
+        return jsonify({"sessions": sessions})
+        
     except Exception as e:
         print(f"[GRAPHS] Error: {e}")
         return jsonify({"error": str(e)}), 500

@@ -242,8 +242,7 @@
             font-size: 14px;
         }
 
-        .control-group input,
-        .control-group select {
+        .control-group input {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid #cbd5e0;
@@ -251,8 +250,7 @@
             font-size: 14px;
         }
 
-        .control-group input:focus,
-        .control-group select:focus {
+        .control-group input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
@@ -453,13 +451,6 @@
             <div class="card">
                 <h2>Historical Data</h2>
                 
-                <div class="control-group">
-                    <label for="logFileSelect">Log file:</label>
-                    <select id="logFileSelect" onchange="loadGraphData()">
-                        <option value="">(latest file)</option>
-                    </select>
-                </div>
-
                 <div class="button-group">
                     <button class="btn-primary" onclick="loadGraphData()">Reload Data</button>
                     <button class="btn-secondary" onclick="downloadData()">📥 Download CSV</button>
@@ -483,7 +474,6 @@
         let temperatureChart = null;
         let loggingStartTime = null;
         let loggingInterval = null;
-        let availableLogFiles = [];
 
         // ========================================
         // UTILITY FUNCTIONS
@@ -686,40 +676,16 @@
 
         async function loadGraphData() {
             console.log('[GRAPHS] Loading graph data...');
-
-            const select = document.getElementById('logFileSelect');
-            const selectedFile = select ? select.value : '';
-
-            const url = selectedFile
-                ? '/api/graphs/data?file=' + encodeURIComponent(selectedFile)
-                : '/api/graphs/data';
-
+            
             try {
-                const response = await fetch(url);
+                const response = await fetch('/api/graphs/data');
                 const result = await response.json();
                 const sessions = result.sessions || {};
-                const files = result.files || [];
 
-                // Populate dropdown once
-                if (files.length) {
-                    availableLogFiles = files;
-                    if (select && select.options.length <= 1) {
-                        files.forEach(f => {
-                            const opt = document.createElement('option');
-                            opt.value = f;
-                            opt.textContent = f;
-                            select.appendChild(opt);
-                        });
-                    }
-                }
+                console.log('[GRAPHS] Received sessions:', Object.keys(sessions));
 
-                const sessionNames = Object.keys(sessions);
-                console.log('[GRAPHS] Sessions in response:', sessionNames);
-
-                if (sessionNames.length === 0) {
-                    document.getElementById('noGraphData').style.display = 'block';
-                    document.getElementById('noGraphData').innerHTML =
-                        '<p>No historical data available yet for this selection.</p>';
+                if (Object.keys(sessions).length === 0) {
+                    document.getElementById('noGraphData').innerHTML = '<p>No historical data available yet. Start logging to create data.</p>';
                     document.getElementById('graphsContainer').style.display = 'none';
                     return;
                 }
@@ -727,29 +693,37 @@
                 document.getElementById('noGraphData').style.display = 'none';
                 document.getElementById('graphsContainer').style.display = 'block';
 
-                // We only plot the first (and only) session in this mode
-                const firstName = sessionNames[0];
-                const data = sessions[firstName];
-
-                const readings = {};
+                // Combine all sessions
+                const allReadings = {};
                 const timestamps = new Set();
 
-                data.forEach(entry => {
-                    timestamps.add(entry.timestamp);
-                    Object.entries(entry.readings).forEach(([sensorId, temp]) => {
-                        if (!readings[sensorId]) readings[sensorId] = {};
-                        readings[sensorId][entry.timestamp] = temp;
+                Object.entries(sessions).forEach(([filename, data]) => {
+                    console.log(`[GRAPHS] Processing ${filename}: ${data.length} rows`);
+                    
+                    data.forEach(entry => {
+                        timestamps.add(entry.timestamp);
+                        Object.entries(entry.readings).forEach(([sensorId, temp]) => {
+                            if (!allReadings[sensorId]) {
+                                allReadings[sensorId] = {};
+                            }
+                            allReadings[sensorId][entry.timestamp] = temp;
+                        });
                     });
                 });
 
                 const sortedTimestamps = Array.from(timestamps).sort();
-                createChart(readings, sortedTimestamps);
+                console.log('[GRAPHS] Total timestamps:', sortedTimestamps.length);
+                console.log('[GRAPHS] Total sensors:', Object.keys(allReadings).length);
 
+                // Create chart
+                createChart(allReadings, sortedTimestamps);
+
+                // Show stats
                 const statsHtml = `
                     <div class="info-box">
                         <strong>Data Summary:</strong><br>
-                        File: ${firstName}<br>
-                        Sensors: ${Object.keys(readings).length}<br>
+                        Sessions: ${Object.keys(sessions).length}<br>
+                        Sensors: ${Object.keys(allReadings).length}<br>
                         Data Points: ${sortedTimestamps.length}
                     </div>
                 `;
@@ -762,14 +736,11 @@
         }
 
         function createChart(readings, timestamps) {
-            const canvas = document.getElementById('temperatureChart');
-
-            // Destroy old chart if it exists
+            const canvas=document.getElementById('temperatureChart');
             if (temperatureChart) {
                 temperatureChart.destroy();
                 temperatureChart = null;
             }
-
             const ctx = canvas.getContext('2d');
 
             const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140'];
@@ -790,6 +761,8 @@
                     pointHoverRadius: 4
                 });
             });
+
+            console.log('[CHARTS] Creating chart with', datasets.length, 'datasets');
 
             temperatureChart = new Chart(ctx, {
                 type: 'line',
