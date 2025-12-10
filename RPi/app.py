@@ -505,7 +505,7 @@ app.config['JSON_SORT_KEYS'] = False
 
 # Global managers
 state_machine = TemperatureSystemStateMachine()
-serial_handler = SerialHandler(use_mock=True)  # Set to False for real Arduino
+serial_handler = SerialHandler(use_mock=False)  # Set to False for real Arduino
 data_manager = SensorDataManager()
 logger = DataLogger()  # GLOBAL logger instance
 
