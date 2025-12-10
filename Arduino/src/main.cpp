@@ -33,6 +33,14 @@ unsigned long lastRescanTime = 0;
 // Temperature resolution (9-12 bits)
 #define TEMPERATURE_PRECISION 12
 
+// FORWARD DECLARATIONS (Function Prototypes)
+// ============================================================================
+
+void scanProbes();
+void readAndTransmitTemperatures();
+void handleSerialCommands();
+void printAddress(DeviceAddress deviceAddress);
+
 // ============================================================================
 // SETUP
 // ============================================================================
