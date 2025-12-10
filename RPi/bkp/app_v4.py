@@ -1,5 +1,5 @@
-# Temperature Monitoring System - Flask Backend (v4 - WITH MOCK MODE BUTTON)
-# Complete working version with per-file graphs + mock mode toggle
+# Temperature Monitoring System - Flask Backend (v3 - PER-FILE GRAPHS)
+# Complete working version with single-file graph selection
 
 import os
 import json
@@ -391,7 +391,7 @@ class SerialReaderThread(threading.Thread):
             if not line:
                 time.sleep(0.1)
                 continue
-            
+
             try:
                 # Parse: "28ABC123:25.50,28DEF456:26.75" or "Invalid_Temperature"
                 current_ids = set()
@@ -505,7 +505,7 @@ app.config['JSON_SORT_KEYS'] = False
 
 # Global managers
 state_machine = TemperatureSystemStateMachine()
-serial_handler = SerialHandler(use_mock=False)  # Change to True for mock mode
+serial_handler = SerialHandler(use_mock=False)  # Set to False for real Arduino
 data_manager = SensorDataManager()
 logger = DataLogger()  # GLOBAL logger instance
 
@@ -513,7 +513,7 @@ logger = DataLogger()  # GLOBAL logger instance
 logging_thread = None
 
 # Config
-MOCK_MODE = False  # Change to True for mock mode
+MOCK_MODE = True  # Set to False for real Arduino
 SERIAL_PORT = "/dev/ttyACM0"
 SERIAL_BAUDRATE = 9600
 LOG_FOLDER = "/home/pi/temperature_logs/"
@@ -712,17 +712,6 @@ def download_graph_csv():
                     outfile.write(infile.read())
         
         return send_file(combined_file, as_attachment=True, download_name="temperature_data.csv")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/mock/enable', methods=['POST'])
-def enable_mock_mode():
-    """Enable mock mode - useful for testing without Arduino"""
-    global serial_handler
-    try:
-        serial_handler.use_mock = True
-        print("[MOCK] Mock mode ENABLED - will generate test data")
-        return jsonify({"status": "ok", "message": "Mock mode enabled"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
