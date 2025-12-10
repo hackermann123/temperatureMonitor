@@ -391,15 +391,26 @@ class SerialReaderThread(threading.Thread):
             if not line:
                 time.sleep(0.1)
                 continue
-            
+
             try:
-                # Parse: "28ABC123:25.50,28DEF456:26.75"
+                # Parse: "28ABC123:25.50,28DEF456:26.75" or "Invalid_Temperature"
                 current_ids = set()
                 readings = line.split(',')
                 
                 for reading in readings:
+                    reading = reading.strip()
+                    
+                    # Skip invalid readings
+                    if 'Invalid' in reading or ':' not in reading:
+                        print(f"[PARSE] Skipping invalid reading: {reading}")
+                        continue
+                        
                     if ':' in reading:
-                        sensor_id, temp_str = reading.split(':')
+                        parts = reading.split(':')
+                        if len(parts) != 2:
+                            continue
+                            
+                        sensor_id, temp_str = parts
                         current_ids.add(sensor_id)
                         
                         try:
@@ -410,7 +421,7 @@ class SerialReaderThread(threading.Thread):
                             if self.state_machine.logging_state == LoggingState.LOGGING:
                                 self.logger.log_reading(self.data_manager.get_sensors())
                         except ValueError:
-                            print(f"[PARSE] Invalid temperature: {temp_str}")
+                            print(f"[PARSE] Invalid temperature value: {temp_str}")
                 
                 # Update state if needed
                 if self.state_machine.current_state == SystemState.WAITING_FOR_SERIAL:
@@ -419,12 +430,6 @@ class SerialReaderThread(threading.Thread):
                 # Detect disconnected sensors
                 self.data_manager.detect_disconnected(current_ids, self.disconnect_timeout)
                 
-                # Periodic Arduino rescan (every 10 seconds)
-                current_time = time.time()
-                if current_time - last_rescan > 10:
-                    self._trigger_arduino_rescan()
-                    last_rescan = current_time
-            
             except Exception as e:
                 print(f"[READER] Parse error: {e}")
             
