@@ -701,15 +701,12 @@
 
         function refreshSensors() {
             fetch(`${API_BASE}/sensors`)
-                .then(r => {
-                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                    return r.json();
-                })
+                .then(r => r.json())
                 .then(data => {
                     const grid = document.getElementById('sensorsGrid');
                     const sensors = data.sensors;
 
-                    if (!sensors || Object.keys(sensors).length === 0) {
+                    if (Object.keys(sensors).length === 0) {
                         grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">No sensors detected. Try rescanning.</div>';
                         return;
                     }
@@ -734,54 +731,6 @@
                 .catch(err => {
                     console.error('Sensor refresh error:', err);
                     showStatus('Error loading sensors', 'error');
-                });
-        }
-
-        function refreshSensorsWithRetry(retries = 3) {
-            fetch(`${API_BASE}/sensors`)
-                .then(r => {
-                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                    return r.json();
-                })
-                .then(data => {
-                    const grid = document.getElementById('sensorsGrid');
-                    const sensors = data.sensors;
-
-                    if (!sensors || Object.keys(sensors).length === 0) {
-                        if (retries > 0) {
-                            console.log(`No sensors yet, retrying... (${retries} attempts left)`);
-                            setTimeout(() => refreshSensorsWithRetry(retries - 1), 1000);
-                            return;
-                        }
-                        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">No sensors detected. Try rescanning.</div>';
-                        return;
-                    }
-
-                    grid.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
-                        <div class="sensor-card ${sensor.status === 'offline' ? 'offline' : ''}">
-                            <div class="name">${sensor.name}</div>
-                            <div class="temperature">${sensor.status === 'online' ? sensor.temperature.toFixed(2) : '--'}°C</div>
-                            <div class="status">${sensor.status === 'online' ? '✓ Online' : '✗ Offline'}</div>
-                        </div>
-                    `).join('');
-
-                    // Build rename form
-                    const renameForm = document.getElementById('renameForm');
-                    renameForm.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
-                        <div class="probe-rename-form">
-                            <input type="text" id="rename_${id}" value="${sensor.name}" placeholder="Probe name">
-                            <button class="btn btn-primary" onclick="renameSensor('${id}')">Rename</button>
-                        </div>
-                    `).join('');
-                })
-                .catch(err => {
-                    console.error('Sensor refresh error:', err);
-                    if (retries > 0) {
-                        console.log(`Error fetching sensors, retrying... (${retries} attempts left)`);
-                        setTimeout(() => refreshSensorsWithRetry(retries - 1), 1500);
-                    } else {
-                        showStatus('Error loading sensors', 'error');
-                    }
                 });
         }
 
@@ -822,13 +771,12 @@
         }
 
         function enableMockMode() {
-            showStatus('⏳ Enabling mock mode...', 'info');
             fetch(`${API_BASE}/mock/enable`, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
                     showStatus('✓ Mock mode enabled', 'success');
                     updateMockModeButton();
-                    setTimeout(() => refreshSensorsWithRetry(3), 1000);
+                    setTimeout(refreshSensors, 500);
                 })
                 .catch(err => {
                     console.error('Mock enable error:', err);
@@ -860,9 +808,9 @@
                     
                     if (mockEnabled) {
                         enableBtn.style.display = 'none';
-                        disableBtn.style.display = 'inline-block';
+                        disableBtn.style.display = 'inline-flex';
                     } else {
-                        enableBtn.style.display = 'inline-block';
+                        enableBtn.style.display = 'inline-flex';
                         disableBtn.style.display = 'none';
                     }
                 })
