@@ -453,7 +453,7 @@
                 <div class="button-group">
                     <button class="btn btn-secondary" onclick="rescanSensors()">🔄 Rescan Sensors</button>
                     <button class="btn btn-secondary" onclick="refreshSensors()">🔃 Refresh Now</button>
-                    <button class="btn btn-primary" id="disableMockBtn" onclick="toggleMockMode()" style="display: none;">✓ Disable Mock Mode</button>
+                    <button class="btn btn-primary" id="mockModeBtn" onclick="toggleMockMode()" style="display: none;">✓ Disable Mock Mode</button>
                     <button class="btn btn-primary" id="enableMockBtn" onclick="enableMockMode()">✓ Enable Mock Mode</button>
                 </div>
                 <div id="statusMessage" class="status-message"></div>
@@ -822,12 +822,10 @@
         }
 
         function enableMockMode() {
-            console.log('🔵 enableMockMode() called');
             showStatus('⏳ Enabling mock mode...', 'info');
             fetch(`${API_BASE}/mock/enable`, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
-                    console.log('🟢 Mock enable response:', data);
                     showStatus('✓ Mock mode enabled', 'success');
                     updateMockModeButton();
                     setTimeout(() => refreshSensorsWithRetry(3), 1000);
@@ -839,11 +837,9 @@
         }
 
         function toggleMockMode() {
-            console.log('🔴 toggleMockMode() called - disabling');
             fetch(`${API_BASE}/mock/disable`, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
-                    console.log('🟢 Mock disable response:', data);
                     showStatus('✓ Mock mode disabled', 'success');
                     updateMockModeButton();
                     setTimeout(refreshSensors, 500);
@@ -855,26 +851,17 @@
         }
 
         function updateMockModeButton() {
-            console.log('🔵 updateMockModeButton() called');
             fetch(`${API_BASE}/system/status`)
                 .then(r => r.json())
                 .then(data => {
-                    console.log('📊 System status response:', data);
                     const mockEnabled = data.mock_mode || false;
-                    console.log('🎯 Mock enabled:', mockEnabled);
-                    
                     const enableBtn = document.getElementById('enableMockBtn');
-                    const disableBtn = document.getElementById('disableMockBtn');
-                    
-                    console.log('✅ enableBtn element:', enableBtn);
-                    console.log('✅ disableBtn element:', disableBtn);
+                    const disableBtn = document.getElementById('mockModeBtn');
                     
                     if (mockEnabled) {
-                        console.log('✅ Mock is ENABLED - showing disable btn');
                         enableBtn.style.display = 'none';
                         disableBtn.style.display = 'inline-block';
                     } else {
-                        console.log('❌ Mock is DISABLED - showing enable btn');
                         enableBtn.style.display = 'inline-block';
                         disableBtn.style.display = 'none';
                     }
