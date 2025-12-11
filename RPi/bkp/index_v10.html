@@ -209,14 +209,6 @@
             background: #5568d3;
         }
 
-        .btn-primary.active {
-            background: #f44336;
-        }
-
-        .btn-primary.active:hover {
-            background: #d32f2f;
-        }
-
         .btn-secondary {
             background: #e0e0e0;
             color: #333;
@@ -461,7 +453,8 @@
                 <div class="button-group">
                     <button class="btn btn-secondary" onclick="rescanSensors()">🔄 Rescan Sensors</button>
                     <button class="btn btn-secondary" onclick="refreshSensors()">🔃 Refresh Now</button>
-                    <button class="btn btn-primary" id="mockModeToggle" onclick="toggleMockMode()">🔴 Mock Mode OFF</button>
+                    <button class="btn btn-primary" id="disableMockBtn" onclick="toggleMockMode()" style="display: none;">✓ Disable Mock Mode</button>
+                    <button class="btn btn-primary" id="enableMockBtn" onclick="enableMockMode()">✓ Enable Mock Mode</button>
                 </div>
                 <div id="statusMessage" class="status-message"></div>
                 <div class="sensors-grid" id="sensorsGrid">
@@ -639,7 +632,6 @@
         let graphChart = null;
         let serialMonitorPaused = false;
         let serialMonitorInterval = null;
-        let mockModeEnabled = false;
 
         // =====================================================================
         // TAB SWITCHING
@@ -699,10 +691,6 @@
                     const statusText = document.getElementById('systemStatusText');
                     statusEl.className = data.serial_connected ? 'status-indicator' : 'status-indicator offline';
                     statusText.textContent = data.serial_connected ? 'Arduino Connected' : 'Arduino Offline';
-                    
-                    // Update mock mode state
-                    mockModeEnabled = data.mock_mode || false;
-                    updateMockModeButton();
                 })
                 .catch(err => console.error('Status update error:', err));
         }
@@ -833,53 +821,65 @@
                 });
         }
 
+        function enableMockMode() {
+            console.log('🔵 enableMockMode() called');
+            showStatus('⏳ Enabling mock mode...', 'info');
+            fetch(`${API_BASE}/mock/enable`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    console.log('🟢 Mock enable response:', data);
+                    showStatus('✓ Mock mode enabled', 'success');
+                    updateMockModeButton();
+                    setTimeout(() => refreshSensorsWithRetry(3), 1000);
+                })
+                .catch(err => {
+                    console.error('Mock enable error:', err);
+                    showStatus('Error enabling mock mode', 'error');
+                });
+        }
+
         function toggleMockMode() {
-            if (mockModeEnabled) {
-                // Disable mock mode
-                console.log('Disabling mock mode...');
-                showStatus('⏳ Disabling mock mode...', 'info');
-                fetch(`${API_BASE}/mock/disable`, { method: 'POST' })
-                    .then(r => r.json())
-                    .then(data => {
-                        console.log('Mock disabled:', data);
-                        mockModeEnabled = false;
-                        updateMockModeButton();
-                        showStatus('✓ Mock mode disabled', 'success');
-                        setTimeout(refreshSensors, 500);
-                    })
-                    .catch(err => {
-                        console.error('Mock disable error:', err);
-                        showStatus('Error disabling mock mode', 'error');
-                    });
-            } else {
-                // Enable mock mode
-                console.log('Enabling mock mode...');
-                showStatus('⏳ Enabling mock mode...', 'info');
-                fetch(`${API_BASE}/mock/enable`, { method: 'POST' })
-                    .then(r => r.json())
-                    .then(data => {
-                        console.log('Mock enabled:', data);
-                        mockModeEnabled = true;
-                        updateMockModeButton();
-                        showStatus('✓ Mock mode enabled', 'success');
-                        setTimeout(() => refreshSensorsWithRetry(3), 1000);
-                    })
-                    .catch(err => {
-                        console.error('Mock enable error:', err);
-                        showStatus('Error enabling mock mode', 'error');
-                    });
-            }
+            console.log('🔴 toggleMockMode() called - disabling');
+            fetch(`${API_BASE}/mock/disable`, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    console.log('🟢 Mock disable response:', data);
+                    showStatus('✓ Mock mode disabled', 'success');
+                    updateMockModeButton();
+                    setTimeout(refreshSensors, 500);
+                })
+                .catch(err => {
+                    console.error('Mock disable error:', err);
+                    showStatus('Error disabling mock mode', 'error');
+                });
         }
 
         function updateMockModeButton() {
-            const btn = document.getElementById('mockModeToggle');
-            if (mockModeEnabled) {
-                btn.textContent = '🟢 Mock Mode ON';
-                btn.classList.add('active');
-            } else {
-                btn.textContent = '🔴 Mock Mode OFF';
-                btn.classList.remove('active');
-            }
+            console.log('🔵 updateMockModeButton() called');
+            fetch(`${API_BASE}/system/status`)
+                .then(r => r.json())
+                .then(data => {
+                    console.log('📊 System status response:', data);
+                    const mockEnabled = data.mock_mode || false;
+                    console.log('🎯 Mock enabled:', mockEnabled);
+                    
+                    const enableBtn = document.getElementById('enableMockBtn');
+                    const disableBtn = document.getElementById('disableMockBtn');
+                    
+                    console.log('✅ enableBtn element:', enableBtn);
+                    console.log('✅ disableBtn element:', disableBtn);
+                    
+                    if (mockEnabled) {
+                        console.log('✅ Mock is ENABLED - showing disable btn');
+                        enableBtn.style.display = 'none';
+                        disableBtn.style.display = 'inline-block';
+                    } else {
+                        console.log('❌ Mock is DISABLED - showing enable btn');
+                        enableBtn.style.display = 'inline-block';
+                        disableBtn.style.display = 'none';
+                    }
+                })
+                .catch(err => console.error('Mock mode button update error:', err));
         }
 
         // =====================================================================
@@ -1294,6 +1294,7 @@
 
             // Initial updates
             updateSystemStatus();
+            updateMockModeButton();
             refreshSensors();
             updateLoggingStatus();
 
