@@ -719,7 +719,19 @@
                 })
                 .then(data => {
                     const grid = document.getElementById('sensorsGrid');
-                    const sensors = data.sensors;
+                    let sensors = data.sensors;
+
+                    // Filter out mock sensors if mock mode is disabled
+                    if (!mockModeEnabled && sensors) {
+                        const filteredSensors = {};
+                        Object.entries(sensors).forEach(([id, sensor]) => {
+                            // Keep only real sensors (those that are not marked as mock)
+                            if (!id.includes('mock') && !sensor.name.toLowerCase().includes('mock')) {
+                                filteredSensors[id] = sensor;
+                            }
+                        });
+                        sensors = filteredSensors;
+                    }
 
                     if (!sensors || Object.keys(sensors).length === 0) {
                         grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">No sensors detected. Try rescanning.</div>';
@@ -834,6 +846,9 @@
         }
 
         function toggleMockMode() {
+            const btn = document.getElementById('mockModeToggle');
+            btn.disabled = true;
+            
             if (mockModeEnabled) {
                 // Disable mock mode
                 console.log('Disabling mock mode...');
@@ -844,12 +859,13 @@
                         console.log('Mock disabled:', data);
                         mockModeEnabled = false;
                         updateMockModeButton();
-                        showStatus('✓ Mock mode disabled', 'success');
+                        showStatus('✓ Mock mode disabled - fake sensors removed', 'success');
                         setTimeout(refreshSensors, 500);
                     })
                     .catch(err => {
                         console.error('Mock disable error:', err);
                         showStatus('Error disabling mock mode', 'error');
+                        btn.disabled = false;
                     });
             } else {
                 // Enable mock mode
@@ -867,6 +883,7 @@
                     .catch(err => {
                         console.error('Mock enable error:', err);
                         showStatus('Error enabling mock mode', 'error');
+                        btn.disabled = false;
                     });
             }
         }
@@ -880,6 +897,7 @@
                 btn.textContent = '🔴 Mock Mode OFF';
                 btn.classList.remove('active');
             }
+            btn.disabled = false;
         }
 
         // =====================================================================
