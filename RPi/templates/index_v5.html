@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Monitoring System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 0 0 10px 10px;
+        }
+
+        header h1 {
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .sensor-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .sensor-card .name {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .sensor-card .temp {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .sensor-card .status {
+            font-size: 12px;
+            opacity: 0.8;
+            padding: 5px 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .sensor-card.offline {
+            background: linear-gradient(135deg, #999 0%, #666 100%);
+            opacity: 0.6;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #38a169;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.online {
+            background: #48bb78;
+        }
+
+        .status-indicator.offline {
+            background: #f56565;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .info-box {
+            background: #edf2f7;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box.warning {
+            background: #fffaf0;
+            border-left-color: #ed8936;
+        }
+
+        .logging-controls {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .control-group input,
+        .control-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .control-group input:focus,
+        .control-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        table th {
+            background: #f7fafc;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        table tr:hover {
+            background: #f7fafc;
+        }
+
+        .editable {
+            cursor: pointer;
+            padding: 4px 8px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+
+        .editable:hover {
+            background: #edf2f7;
+            border-color: #cbd5e0;
+        }
+
+        .status-message {
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-message.success {
+            background: #c6f6d5;
+            color: #22543d;
+            border-left: 4px solid #48bb78;
+        }
+
+        .status-message.error {
+            background: #fed7d7;
+            color: #742a2a;
+            border-left: 4px solid #f56565;
+        }
+
+        .status-message.info {
+            background: #bee3f8;
+            color: #2c5282;
+            border-left: 4px solid #667eea;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .mock-mode-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: #fffaf0;
+            border: 1px solid #fed7d7;
+            border-radius: 4px;
+        }
+
+        .mock-mode-section p {
+            font-size: 12px;
+            color: #666;
+            margin: 8px 0 0 0;
+        }
+
+        .disable-mock-btn {
+            background: #fed7d7 !important;
+            color: #742a2a !important;
+        }
+
+        .disable-mock-btn:hover {
+            background: #fecaca !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌡️ Temperature Monitoring System</h1>
+            <p>Real-time temperature monitoring with data logging and historical analysis</p>
+        </header>
+
+        <div class="status-message" id="statusMessage"></div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+            <button class="tab-btn" onclick="switchTab('logging')">💾 Data Logging</button>
+            <button class="tab-btn" onclick="switchTab('probes')">🔍 Manage Probes</button>
+            <button class="tab-btn" onclick="switchTab('graphs')">📈 Historical Graphs</button>
+        </div>
+
+        <!-- DASHBOARD TAB -->
+        <div id="dashboard" class="tab-content active">
+            <div class="card">
+                <h2>Current Status</h2>
+                <div class="info-box">
+                    <span class="status-indicator online" id="statusIndicator"></span>
+                    <span id="statusText">Connecting...</span>
+                </div>
+                
+                <!-- Mock Mode Button - Show when no sensors -->
+                <div id="mockModeSection" style="display: none;" class="mock-mode-section">
+                    <button class="btn-secondary" onclick="enableMockMode()">
+                        🎮 Enable Mock Mode (Testing)
+                    </button>
+                    <p>No Arduino detected. Enable mock mode to test with simulated sensors.</p>
+                </div>
+
+                <!-- Disable Mock Mode Button - Show when mock is active -->
+                <div id="disableMockSection" style="display: none;" class="mock-mode-section">
+                    <button class="btn-secondary disable-mock-btn" onclick="disableMockMode()">
+                        ⏹️ Disable Mock Mode
+                    </button>
+                    <p>Mock mode is active. Disable to switch back to Arduino mode.</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Live Temperature Readings</h2>
+                <div class="sensor-grid" id="sensorGrid">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading sensors...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGGING TAB -->
+        <div id="logging" class="tab-content">
+            <div class="card">
+                <h2>Data Logging Controls</h2>
+                
+                <div class="logging-controls">
+                    <div class="control-group">
+                        <label>Log Folder Path:</label>
+                        <input type="text" id="logFolder" value="/home/pi/temperature_logs/" placeholder="/path/to/logs">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Duration (seconds, 0 = unlimited):</label>
+                        <input type="number" id="logDuration" value="600" min="0" placeholder="600">
+                    </div>
+
+                    <div class="control-group">
+                        <label>Sample Interval (seconds):</label>
+                        <input type="number" id="logInterval" value="60" min="10" placeholder="60">
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-success" id="startLoggingBtn" onclick="startLogging()">Start Logging</button>
+                        <button class="btn-danger" id="stopLoggingBtn" onclick="stopLogging()" disabled>Stop Logging</button>
+                    </div>
+                </div>
+
+                <div id="loggingStatus" class="info-box" style="display: none;">
+                    <div><strong>Session Status:</strong> <span id="sessionStatus">Idle</span></div>
+                    <div><strong>Logged Filename:</strong> <span id="loggedFilename">None</span></div>
+                    <div><strong>Start Time:</strong> <span id="logStartTime">-</span></div>
+                    <div><strong>Elapsed Time:</strong> <span id="logElapsedTime">0s</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MANAGE PROBES TAB -->
+        <div id="probes" class="tab-content">
+            <div class="card">
+                <h2>Connected Probes</h2>
+                
+                <div class="button-group">
+                    <button class="btn-primary" onclick="rescanProbes()">🔄 Rescan Probes</button>
+                </div>
+
+                <table id="probesTable">
+                    <thead>
+                        <tr>
+                            <th>Name (Click to Edit)</th>
+                            <th>OneWire Address</th>
+                            <th>Status</th>
+                            <th>Last Update</th>
+                        </tr>
+                    </thead>
+                    <tbody id="probesTableBody">
+                        <tr><td colspan="4" class="loading">Loading probes...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- GRAPHS TAB -->
+        <div id="graphs" class="tab-content">
+            <div class="card">
+                <h2>Historical Data</h2>
+                
+                <div class="control-group">
+                    <label for="logFileSelect">Log file:</label>
+                    <select id="logFileSelect" onchange="loadGraphData()">
+                        <option value="">(latest file)</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="loadGraphData()">Reload Data</button>
+                    <button class="btn-secondary" onclick="downloadData()">📥 Download CSV</button>
+                </div>
+
+                <div id="noGraphData" class="info-box warning">
+                    Loading historical data... Please wait.
+                </div>
+
+                <div id="graphsContainer" style="display: none;">
+                    <div class="chart-container">
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                    <div id="graphStats"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let temperatureChart = null;
+        let loggingStartTime = null;
+        let loggingInterval = null;
+        let availableLogFiles = [];
+
+        // ========================================
+        // UTILITY FUNCTIONS
+        // ========================================
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Remove active from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+
+            // Mark button as active
+            event.target.classList.add('active');
+
+            // Load data if needed
+            if (tabName === 'graphs') {
+                loadGraphData();
+            }
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message show ${type}`;
+            setTimeout(() => statusEl.classList.remove('show'), 5000);
+        }
+
+        // ========================================
+        // DASHBOARD TAB
+        // ========================================
+
+        async function enableMockMode() {
+            try {
+                const response = await fetch('/api/mock/enable', { method: 'POST' });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('Mock mode enabled. Refresh to see test sensors.', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showStatus('Error enabling mock mode: ' + result.error, 'error');
+                }
+            } catch (err) {
+                showStatus('Error: ' + err.message, 'error');
+            }
+        }
+
+        async function disableMockMode() {
+            try {
+                const response = await fetch('/api/mock/disable', { method: 'POST' });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('Mock mode disabled. Waiting for Arduino...', 'info');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showStatus('Error disabling mock mode: ' + result.error, 'error');
+                }
+            } catch (err) {
+                showStatus('Error: ' + err.message, 'error');
+            }
+        }
+
+        function updateDashboard() {
+            fetch('/api/sensors')
+                .then(r => r.json())
+                .then(data => {
+                    const sensors = data.sensors || {};
+                    const grid = document.getElementById('sensorGrid');
+                    const mockModeSection = document.getElementById('mockModeSection');
+                    const disableMockSection = document.getElementById('disableMockSection');
+
+                    if (Object.keys(sensors).length === 0) {
+                        grid.innerHTML = '<div class="loading"><p>No sensors detected. Check Arduino connection.</p></div>';
+                        mockModeSection.style.display = 'block';
+                        disableMockSection.style.display = 'none';
+                        return;
+                    }
+                    
+                    mockModeSection.style.display = 'none';
+                    disableMockSection.style.display = 'block';
+
+                    grid.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
+                        <div class="sensor-card ${sensor.status === 'offline' ? 'offline' : ''}">
+                            <div class="name">${sensor.name}</div>
+                            <div class="temp">${sensor.temperature !== undefined ? sensor.temperature.toFixed(2) : 'N/A'}°C</div>
+                            <div class="status">${sensor.status.toUpperCase()}</div>
+                        </div>
+                    `).join('');
+
+                    // Update status indicator
+                    const connected = Object.values(sensors).some(s => s.status === 'online');
+                    const indicator = document.getElementById('statusIndicator');
+                    const statusText = document.getElementById('statusText');
+                    
+                    if (connected) {
+                        indicator.className = 'status-indicator online';
+                        statusText.textContent = '✓ Connected - ' + Object.keys(sensors).length + ' sensor(s) detected';
+                    } else {
+                        indicator.className = 'status-indicator offline';
+                        statusText.textContent = '⚠ Waiting for Arduino connection...';
+                    }
+                })
+                .catch(err => console.error('Dashboard update error:', err));
+        }
+
+        // ========================================
+        // LOGGING TAB
+        // ========================================
+
+        async function startLogging() {
+            const folder = document.getElementById('logFolder').value;
+            const duration = parseInt(document.getElementById('logDuration').value);
+            const interval = parseInt(document.getElementById('logInterval').value);
+
+            try {
+                const response = await fetch('/api/logging/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder, duration: duration || null, interval })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    loggingStartTime = Date.now();
+                    document.getElementById('loggedFilename').textContent = result.filename;
+                    document.getElementById('logStartTime').textContent = new Date().toLocaleTimeString();
+                    document.getElementById('loggingStatus').style.display = 'block';
+                    document.getElementById('startLoggingBtn').disabled = true;
+                    document.getElementById('stopLoggingBtn').disabled = false;
+                    document.getElementById('sessionStatus').textContent = 'LOGGING';
+
+                    // Update elapsed time
+                    loggingInterval = setInterval(() => {
+                        const elapsed = Math.floor((Date.now() - loggingStartTime) / 1000);
+                        document.getElementById('logElapsedTime').textContent = elapsed + 's';
+                    }, 1000);
+
+                    showStatus('Logging started: ' + result.filename, 'success');
+                } else {
+                    showStatus('Error: ' + result.error, 'error');
+                }
+            } catch (err) {
+                showStatus('Error starting logging: ' + err.message, 'error');
+            }
+        }
+
+        async function stopLogging() {
+            try {
+                const response = await fetch('/api/logging/stop', { method: 'POST' });
+                const result = await response.json();
+
+                if (response.ok) {
+                    clearInterval(loggingInterval);
+                    document.getElementById('loggedFilename').textContent = result.filename;
+                    document.getElementById('sessionStatus').textContent = 'STOPPED';
+                    document.getElementById('startLoggingBtn').disabled = false;
+                    document.getElementById('stopLoggingBtn').disabled = true;
+                    showStatus('Logging stopped: ' + result.filename, 'success');
+                } else {
+                    showStatus('Error: ' + result.error, 'error');
+                }
+            } catch (err) {
+                showStatus('Error stopping logging: ' + err.message, 'error');
+            }
+        }
+
+        // ========================================
+        // MANAGE PROBES TAB
+        // ========================================
+
+        async function rescanProbes() {
+            try {
+                const response = await fetch('/api/probes/rescan', { method: 'POST' });
+                const result = await response.json();
+                updateProbesTable(result.sensors);
+                showStatus('Probes rescanned', 'success');
+            } catch (err) {
+                showStatus('Error rescanning probes: ' + err.message, 'error');
+            }
+        }
+
+        function updateProbesTable(sensors) {
+            const tbody = document.getElementById('probesTableBody');
+
+            if (!sensors || Object.keys(sensors).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">No probes detected</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
+                <tr>
+                    <td>
+                        <span class="editable" ondblclick="editProbeName(this, '${id}')" data-id="${id}">
+                            ${sensor.name}
+                        </span>
+                    </td>
+                    <td><code>${id}</code></td>
+                    <td><span class="status-indicator ${sensor.status}"></span>${sensor.status}</td>
+                    <td>${new Date(sensor.lastUpdate * 1000).toLocaleTimeString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function editProbeName(element, sensorId) {
+            const currentName = element.textContent;
+            const newName = prompt('Enter new name:', currentName);
+
+            if (newName && newName !== currentName) {
+                try {
+                    const response = await fetch('/api/probes/rename', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sensor_id: sensorId, name: newName })
+                    });
+
+                    if (response.ok) {
+                        element.textContent = newName;
+                        showStatus('Probe renamed to: ' + newName, 'success');
+                    }
+                } catch (err) {
+                    showStatus('Error renaming probe: ' + err.message, 'error');
+                }
+            }
+        }
+
+        // ========================================
+        // GRAPHS TAB
+        // ========================================
+
+        async function loadGraphData() {
+            console.log('[GRAPHS] Loading graph data...');
+
+            const select = document.getElementById('logFileSelect');
+            const selectedFile = select ? select.value : '';
+
+            const url = selectedFile
+                ? '/api/graphs/data?file=' + encodeURIComponent(selectedFile)
+                : '/api/graphs/data';
+
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+                const sessions = result.sessions || {};
+                const files = result.files || [];
+
+                // Populate dropdown once
+                if (files.length) {
+                    availableLogFiles = files;
+                    if (select && select.options.length <= 1) {
+                        files.forEach(f => {
+                            const opt = document.createElement('option');
+                            opt.value = f;
+                            opt.textContent = f;
+                            select.appendChild(opt);
+                        });
+                    }
+                }
+
+                const sessionNames = Object.keys(sessions);
+                console.log('[GRAPHS] Sessions in response:', sessionNames);
+
+                if (sessionNames.length === 0) {
+                    document.getElementById('noGraphData').style.display = 'block';
+                    document.getElementById('noGraphData').innerHTML =
+                        '<p>No historical data available yet for this selection.</p>';
+                    document.getElementById('graphsContainer').style.display = 'none';
+                    return;
+                }
+
+                document.getElementById('noGraphData').style.display = 'none';
+                document.getElementById('graphsContainer').style.display = 'block';
+
+                // We only plot the first (and only) session in this mode
+                const firstName = sessionNames[0];
+                const data = sessions[firstName];
+
+                const readings = {};
+                const timestamps = new Set();
+
+                data.forEach(entry => {
+                    timestamps.add(entry.timestamp);
+                    Object.entries(entry.readings).forEach(([sensorId, temp]) => {
+                        if (!readings[sensorId]) readings[sensorId] = {};
+                        readings[sensorId][entry.timestamp] = temp;
+                    });
+                });
+
+                const sortedTimestamps = Array.from(timestamps).sort();
+                createChart(readings, sortedTimestamps);
+
+                const statsHtml = `
+                    <div class="info-box">
+                        <strong>Data Summary:</strong><br>
+                        File: ${firstName}<br>
+                        Sensors: ${Object.keys(readings).length}<br>
+                        Data Points: ${sortedTimestamps.length}
+                    </div>
+                `;
+                document.getElementById('graphStats').innerHTML = statsHtml;
+
+            } catch (err) {
+                console.error('[GRAPHS] Error loading data:', err);
+                showStatus('Error loading graph data: ' + err.message, 'error');
+            }
+        }
+
+        function createChart(readings, timestamps) {
+            const canvas = document.getElementById('temperatureChart');
+
+            // Destroy old chart if it exists
+            if (temperatureChart) {
+                temperatureChart.destroy();
+                temperatureChart = null;
+            }
+
+            const ctx = canvas.getContext('2d');
+
+            const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140'];
+            const datasets = [];
+
+            Object.entries(readings).forEach(([sensorId, data], index) => {
+                const values = timestamps.map(ts => data[ts] || null);
+                const color = colors[index % colors.length];
+
+                datasets.push({
+                    label: sensorId.substring(0, 12) + '...',
+                    data: values,
+                    borderColor: color,
+                    backgroundColor: color + '20',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 2,
+                    pointHoverRadius: 4
+                });
+            });
+
+            temperatureChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timestamps.map(ts => new Date(ts).toLocaleTimeString()),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Temperature History'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'Temperature (°C)' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Time' }
+                        }
+                    }
+                }
+            });
+
+            console.log('[CHARTS] Chart created successfully');
+        }
+
+        async function downloadData() {
+            window.location.href = '/api/graphs/download';
+        }
+
+        // ========================================
+        // INITIALIZATION
+        // ========================================
+
+        // Update dashboard every 2 seconds
+        updateDashboard();
+        setInterval(updateDashboard, 2000);
+
+        // Load probes on startup
+        fetch('/api/sensors')
+            .then(r => r.json())
+            .then(data => updateProbesTable(data.sensors));
+    </script>
+</body>
+</html>
