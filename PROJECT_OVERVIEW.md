@@ -51,9 +51,9 @@ A **complete IoT solution** for real-time temperature monitoring with web dashbo
 ┌─────────────────────────────────────────────────────────┐
 │                    WEB BROWSER                          │
 │  ┌───────────────────────────────────────────────────┐  │
-│  │ Dashboard │ Logging │ Probes │ Graphs │ Mock Mode│  │
+│  │ Dashboard │ Logging │ Probes │ Graphs │ Mock Mode│   │
 │  └───────────────────────────────────────────────────┘  │
-│                        │ HTTP                            │
+│                        │ HTTP                           │
 └────────────────────────┼────────────────────────────────┘
                          │
         ┌────────────────┴─────────────────┐

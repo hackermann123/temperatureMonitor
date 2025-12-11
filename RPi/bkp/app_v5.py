@@ -1,5 +1,5 @@
-# Temperature Monitoring System - Flask Backend (v6 - WITH SERIAL MONITOR)
-# Complete implementation with SerialMessageQueue and improved data handling
+# Temperature Monitoring System - Flask Backend (v4 - WITH MOCK MODE BUTTON)
+# Complete working version with per-file graphs + mock mode toggle
 
 import os
 import json
@@ -32,60 +32,6 @@ class LoggingState(Enum):
     STOPPING = "stopping"
 
 # ============================================================================
-# SERIAL MESSAGE QUEUE
-# ============================================================================
-
-class SerialMessageQueue:
-    """
-    Store and manage incoming serial messages for Serial Monitor display.
-    Automatically caps at max_messages to prevent memory bloat.
-    """
-    
-    def __init__(self, max_messages=100):
-        self.messages = []
-        self.max_messages = max_messages
-        self.lock = threading.Lock()
-    
-    def add(self, message, msg_type="info", timestamp=None):
-        """
-        Add message with type classification
-        
-        msg_type options:
-        - "temperature": Temperature readings
-        - "info": Info messages (RESCAN_COMPLETE, etc)
-        - "warning": Warning messages (OFFLINE, etc)
-        - "error": Error messages (CRC_FAILED, etc)
-        - "unknown": Could not classify
-        """
-        with self.lock:
-            self.messages.append({
-                "timestamp": timestamp or time.time(),
-                "message": message,
-                "type": msg_type
-            })
-            
-            # Keep only last N messages to prevent memory bloat
-            if len(self.messages) > self.max_messages:
-                self.messages.pop(0)
-    
-    def get_all(self):
-        """Get all messages"""
-        with self.lock:
-            return list(self.messages)
-    
-    def get_filtered(self, msg_type=None):
-        """Get messages filtered by type"""
-        with self.lock:
-            if msg_type:
-                return [m for m in self.messages if m["type"] == msg_type]
-            return list(self.messages)
-    
-    def clear(self):
-        """Clear all messages"""
-        with self.lock:
-            self.messages.clear()
-
-# ============================================================================
 # STATE MACHINE MANAGER
 # ============================================================================
 
@@ -108,6 +54,7 @@ class TemperatureSystemStateMachine:
             self.current_state = new_state
             self.error_message = error_msg
             
+            # Log state transitions for debugging
             print(f"[STATE] {old_state.value} → {new_state.value}")
             if error_msg:
                 print(f"[ERROR] {error_msg}")
@@ -162,7 +109,7 @@ class SerialHandler:
             self.ser = serial.Serial(self.port, self.baudrate, timeout=1)
             self.is_connected = True
             print(f"[SERIAL] Connected to {self.port} at {self.baudrate} baud")
-            time.sleep(2)
+            time.sleep(2)  # Wait for Arduino to reset
             return True
         except Exception as e:
             print(f"[SERIAL] Connection failed: {e}")
@@ -188,6 +135,7 @@ class SerialHandler:
         self.mock_counter += 1
         import random
         
+        # Generate 2-5 random sensors with varying temps
         num_sensors = random.randint(2, 5)
         sensors = []
         
@@ -197,7 +145,7 @@ class SerialHandler:
             sensors.append(f"{sensor_id}:{temp:.2f}")
         
         data = ",".join(sensors)
-        time.sleep(0.5)
+        time.sleep(0.5)  # Simulate read delay
         return data
     
     def disconnect(self):
@@ -307,6 +255,7 @@ class DataLogger:
                 self.current_handle = open(filepath, 'w')
                 self.current_file = filepath
                 
+                # Write header
                 header = "Timestamp," + ",".join([f"{name}" for name in sorted(sensors.keys())])
                 self.current_handle.write(header + "\n")
                 self.current_handle.flush()
@@ -326,13 +275,14 @@ class DataLogger:
             try:
                 timestamp = datetime.now().isoformat()
                 
+                # Build CSV row with sensor values in order
                 row = timestamp
                 for sensor_id in sorted(sensors_dict.keys()):
                     sensor = sensors_dict[sensor_id]
                     if sensor["status"] == "online":
                         value = f"{sensor['temperature']:.2f}"
                     else:
-                        value = "NC"
+                        value = "NC"  # No Connection
                     row += f",{value}"
                 
                 self.current_handle.write(row + "\n")
@@ -370,9 +320,11 @@ class DataLogger:
             with open(filepath, 'r') as f:
                 lines = f.readlines()
                 if not lines:
+                    print(f"[LOGGER] Empty file: {filename}")
                     return None
                 
-                headers = lines[0].strip().split(',')[1:]
+                headers = lines[0].strip().split(',')[1:]  # Skip timestamp
+                print(f"[LOGGER] Loaded headers from {filename}: {headers}")
                 
                 for line in lines[1:]:
                     values = line.strip().split(',')
@@ -382,7 +334,10 @@ class DataLogger:
                         for i, header in enumerate(headers):
                             try:
                                 val = values[i + 1]
-                                readings[header] = float(val) if val != "NC" else None
+                                if val == "NC":
+                                    readings[header] = None
+                                else:
+                                    readings[header] = float(val)
                             except (ValueError, IndexError):
                                 readings[header] = None
                         data.append({"timestamp": timestamp, "readings": readings})
@@ -404,18 +359,17 @@ class DataLogger:
 class SerialReaderThread(threading.Thread):
     """
     Continuously reads from Arduino and updates sensor data.
-    Now with improved message handling and Serial Monitor support.
+    Runs in background thread.
     """
     
-    def __init__(self, serial_handler, data_manager, state_machine, logger, message_queue):
+    def __init__(self, serial_handler, data_manager, state_machine, logger):
         super().__init__(daemon=True)
         self.serial_handler = serial_handler
         self.data_manager = data_manager
         self.state_machine = state_machine
         self.logger = logger
-        self.message_queue = message_queue
         self.running = True
-        self.disconnect_timeout = 30
+        self.disconnect_timeout = 30  # seconds
     
     def run(self):
         """Main thread loop"""
@@ -438,64 +392,36 @@ class SerialReaderThread(threading.Thread):
                 time.sleep(0.1)
                 continue
             
-            # Log raw data to Serial Monitor
-            self.message_queue.add(line, "raw")
-            
             try:
+                # Parse: "28ABC123:25.50,28DEF456:26.75" or "Invalid_Temperature"
                 current_ids = set()
                 readings = line.split(',')
                 
                 for reading in readings:
                     reading = reading.strip()
                     
-                    # Skip empty readings
-                    if not reading:
+                    # Skip invalid readings
+                    if 'Invalid' in reading or ':' not in reading:
+                        print(f"[PARSE] Skipping invalid reading: {reading}")
                         continue
-                    
-                    # ===== TEMPERATURE DATA =====
-                    if ':' in reading and not any(x in reading.upper() for x in ['ERROR', 'WARN', 'FAIL', 'INFO']):
+                        
+                    if ':' in reading:
                         parts = reading.split(':')
-                        if len(parts) == 2:
-                            sensor_id, temp_str = parts
-                            current_ids.add(sensor_id)
+                        if len(parts) != 2:
+                            continue
                             
-                            try:
-                                temp = float(temp_str)
-                                self.data_manager.update_sensor(sensor_id, temp, "online")
-                                self.message_queue.add(reading, "temperature")
-                                
-                                # Log if currently logging
-                                if self.state_machine.logging_state == LoggingState.LOGGING:
-                                    self.logger.log_reading(self.data_manager.get_sensors())
-                                    
-                            except ValueError:
-                                msg = f"Invalid temperature value: {temp_str}"
-                                self.message_queue.add(msg, "warning")
-                                print(f"[PARSE] {msg}")
-                    
-                    # ===== ERROR MESSAGES =====
-                    elif 'ERROR' in reading.upper() or 'FAIL' in reading.upper():
-                        self.message_queue.add(reading, "error")
-                        print(f"[ARDUINO_ERROR] {reading}")
-                    
-                    # ===== WARNING MESSAGES =====
-                    elif 'WARN' in reading.upper() or 'OFFLINE' in reading.upper():
-                        self.message_queue.add(reading, "warning")
-                        print(f"[ARDUINO_WARN] {reading}")
-                    
-                    elif 'Invalid' in reading:
-                        self.message_queue.add(reading, "warning")
-                        print(f"[ARDUINO_WARN] {reading}")
-                    
-                    # ===== INFO MESSAGES =====
-                    elif 'INFO' in reading.upper() or any(x in reading.upper() for x in ['RESCAN', 'FOUND', 'COMPLETE']):
-                        self.message_queue.add(reading, "info")
-                        print(f"[ARDUINO_INFO] {reading}")
-                    
-                    # ===== UNKNOWN FORMAT =====
-                    else:
-                        self.message_queue.add(reading, "unknown")
-                        print(f"[ARDUINO_UNKNOWN] {reading}")
+                        sensor_id, temp_str = parts
+                        current_ids.add(sensor_id)
+                        
+                        try:
+                            temp = float(temp_str)
+                            self.data_manager.update_sensor(sensor_id, temp, "online")
+                            
+                            # Log if currently logging
+                            if self.state_machine.logging_state == LoggingState.LOGGING:
+                                self.logger.log_reading(self.data_manager.get_sensors())
+                        except ValueError:
+                            print(f"[PARSE] Invalid temperature value: {temp_str}")
                 
                 # Update state if needed
                 if self.state_machine.current_state == SystemState.WAITING_FOR_SERIAL:
@@ -505,11 +431,17 @@ class SerialReaderThread(threading.Thread):
                 self.data_manager.detect_disconnected(current_ids, self.disconnect_timeout)
                 
             except Exception as e:
-                msg = f"Parse error: {e}"
-                self.message_queue.add(msg, "error")
-                print(f"[READER] {msg}")
+                print(f"[READER] Parse error: {e}")
             
             time.sleep(0.1)
+    
+    def _trigger_arduino_rescan(self):
+        """Send rescan command to Arduino"""
+        try:
+            if self.serial_handler.ser and self.serial_handler.ser.is_open:
+                self.serial_handler.ser.write(b"RESCAN\n")
+        except:
+            pass
     
     def stop(self):
         """Stop the reader thread"""
@@ -530,8 +462,8 @@ class LoggingThread(threading.Thread):
         self.data_manager = data_manager
         self.logger = logger
         self.state_machine = state_machine
-        self.duration = duration
-        self.interval = interval
+        self.duration = duration  # seconds, or None for indefinite
+        self.interval = interval  # seconds between samples
         self.running = False
         self.start_time = None
     
@@ -545,11 +477,13 @@ class LoggingThread(threading.Thread):
             current_time = time.time()
             elapsed = current_time - self.start_time
             
+            # Check duration limit
             if self.duration and elapsed > self.duration:
                 print("[LOGGER] Duration limit reached")
                 self.running = False
                 break
             
+            # Log at interval
             if current_time - last_log >= self.interval:
                 sensors = self.data_manager.get_sensors()
                 if sensors:
@@ -571,15 +505,15 @@ app.config['JSON_SORT_KEYS'] = False
 
 # Global managers
 state_machine = TemperatureSystemStateMachine()
-serial_handler = SerialHandler(use_mock=False)
+serial_handler = SerialHandler(use_mock=False)  # Change to True for mock mode
 data_manager = SensorDataManager()
-logger = DataLogger()
-serial_message_queue = SerialMessageQueue(max_messages=100)
+logger = DataLogger()  # GLOBAL logger instance
 
 # Global logging thread
 logging_thread = None
 
 # Config
+MOCK_MODE = False  # Change to True for mock mode
 SERIAL_PORT = "/dev/ttyACM0"
 SERIAL_BAUDRATE = 9600
 LOG_FOLDER = "/home/pi/temperature_logs/"
@@ -621,6 +555,7 @@ def rename_probe():
         return jsonify({"error": "Missing parameters"}), 400
     
     data_manager.rename_sensor(sensor_id, name)
+    
     return jsonify({"status": "ok"})
 
 @app.route('/api/logging/start', methods=['POST'])
@@ -633,17 +568,21 @@ def start_logging():
     
     data = request.get_json()
     folder = data.get('folder', LOG_FOLDER)
-    duration = data.get('duration')
-    interval = data.get('interval', 60)
+    duration = data.get('duration')  # seconds
+    interval = data.get('interval', 60)  # seconds
     
     try:
+        # Create new logger instance for this session
         logger = DataLogger(folder)
+        
+        # Start session
         sensors = data_manager.get_sensors()
         filename = logger.start_session(sensors)
         
         if not filename:
             return jsonify({"error": "Failed to create log file"}), 500
         
+        # Start logging thread
         logging_thread = LoggingThread(data_manager, logger, state_machine, duration, interval)
         logging_thread.start()
         
@@ -658,6 +597,7 @@ def start_logging():
             "interval": interval
         })
     except Exception as e:
+        print(f"[ERROR] Start logging failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/logging/stop', methods=['POST'])
@@ -676,28 +616,39 @@ def stop_logging():
         state_machine.set_state(SystemState.READING)
         
         if filename:
-            return jsonify({"status": "ok", "filename": filename})
+            return jsonify({
+                "status": "ok",
+                "filename": filename
+            })
         else:
-            return jsonify({"status": "error", "error": "Failed to close log file"}), 500
+            return jsonify({
+                "status": "error",
+                "error": "Failed to close log file"
+            }), 500
             
     except Exception as e:
+        print(f"[ERROR] Stop logging failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/graphs/data', methods=['GET'])
 def get_graph_data():
-    """Get historical graph data"""
+    """Get historical graph data - single file or list all files."""
     try:
         log_folder = Path(LOG_FOLDER)
         log_folder.mkdir(parents=True, exist_ok=True)
 
+        # Optional ?file=temperature_log_YYYY-MM-DD_HH-MM-SS.csv
         requested_file = request.args.get('file')
+
         csv_files = sorted(log_folder.glob("temperature_log_*.csv"))
+        print(f"[GRAPHS] Found {len(csv_files)} CSV files in {log_folder}")
 
         if not csv_files:
             return jsonify({"sessions": {}, "files": []})
 
         files_list = [f.name for f in csv_files]
 
+        # If a specific file is requested, restrict to that
         if requested_file:
             requested_path = log_folder / requested_file
             if requested_path.exists():
@@ -708,6 +659,7 @@ def get_graph_data():
         sessions = {}
 
         for csv_file in csv_files:
+            print(f"[GRAPHS] Loading: {csv_file.name}")
             data = []
             try:
                 with open(csv_file, "r") as f:
@@ -729,12 +681,15 @@ def get_graph_data():
                             data.append({"timestamp": timestamp, "readings": readings})
                 if data:
                     sessions[csv_file.name] = data
+                    print(f"[GRAPHS] Loaded {len(data)} rows from {csv_file.name}")
             except Exception as e:
                 print(f"[GRAPHS] Error loading {csv_file.name}: {e}")
 
+        print(f"[GRAPHS] Returning {len(sessions)} sessions, total files: {len(files_list)}")
         return jsonify({"sessions": sessions, "files": files_list})
 
     except Exception as e:
+        print(f"[GRAPHS] Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/graphs/download', methods=['GET'])
@@ -749,6 +704,7 @@ def download_graph_csv():
         if not csv_files:
             return jsonify({"error": "No data available"}), 404
         
+        # Combine all data
         combined_file = log_folder / "combined_export.csv"
         with open(combined_file, 'w') as outfile:
             for csv_file in csv_files:
@@ -761,43 +717,28 @@ def download_graph_csv():
 
 @app.route('/api/mock/enable', methods=['POST'])
 def enable_mock_mode():
-    """Enable mock mode"""
+    """Enable mock mode - useful for testing without Arduino"""
     global serial_handler
     try:
         serial_handler.use_mock = True
-        msg = "Mock mode ENABLED - generating test data"
-        serial_message_queue.add(msg, "info")
-        print(f"[MOCK] {msg}")
-        return jsonify({"status": "ok", "message": msg})
+        print("[MOCK] Mock mode ENABLED - will generate test data")
+        return jsonify({"status": "ok", "message": "Mock mode enabled"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/mock/disable', methods=['POST'])
 def disable_mock_mode():
-    """Disable mock mode"""
+    """Disable mock mode - switch back to Arduino"""
     global serial_handler, data_manager
     try:
         serial_handler.use_mock = False
+        # Clear old mock sensors from memory
         data_manager.sensors.clear()
-        msg = "Mock mode DISABLED - waiting for Arduino"
-        serial_message_queue.add(msg, "info")
-        print(f"[MOCK] {msg}")
-        return jsonify({"status": "ok", "message": msg})
+        print("[MOCK] Mock mode DISABLED - waiting for Arduino connection")
+        return jsonify({"status": "ok", "message": "Mock mode disabled"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/serial/messages', methods=['GET'])
-def get_serial_messages():
-    """Get serial monitor messages with optional type filter"""
-    msg_type = request.args.get('type')
-    messages = serial_message_queue.get_filtered(msg_type)
-    return jsonify({"messages": messages})
-
-@app.route('/api/serial/messages', methods=['DELETE'])
-def clear_serial_messages():
-    """Clear all serial messages"""
-    serial_message_queue.clear()
-    return jsonify({"status": "ok"})
 
 @app.route('/api/system/status', methods=['GET'])
 def system_status():
@@ -816,13 +757,14 @@ def system_status():
 
 def startup_sequence():
     """Initialize system on startup"""
-    print("[STARTUP] Initializing Temperature Monitoring System v6")
+    print("[STARTUP] Initializing Temperature Monitoring System")
     print(f"[STARTUP] Log folder: {LOG_FOLDER}")
-    print("[STARTUP] Serial Message Queue: 100 messages max")
     
+    # Ensure log folder exists
     Path(LOG_FOLDER).mkdir(parents=True, exist_ok=True)
     
-    reader = SerialReaderThread(serial_handler, data_manager, state_machine, logger, serial_message_queue)
+    # Start serial reader thread
+    reader = SerialReaderThread(serial_handler, data_manager, state_machine, logger)
     reader.start()
     
     print("[STARTUP] Serial reader thread started")

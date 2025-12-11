@@ -1,238 +1,261 @@
-// Temperature Monitoring System - Arduino Sketch
-// Target: Arduino UNO with DS18B20 OneWire Sensors
-// Libraries: OneWire, DallasTemperature
+/*
+ * Temperature Monitoring System - Arduino Sketch v2
+ * With improved diagnostics and Serial Monitor messages
+ * 
+ * Reads DS18B20 OneWire sensors and sends both temperature data
+ * and diagnostic messages to Serial Monitor
+ * 
+ * Supports up to 10 sensors on the OneWire bus
+ */
 
 #include <OneWire.h>
-#include <DallasTemperature.h>
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-#define ONE_WIRE_BUS 2                    // OneWire data pin on Arduino
-#define SAMPLING_INTERVAL 2000            // milliseconds (2 seconds)
-#define RESCAN_INTERVAL 10000             // milliseconds (10 seconds)
-#define MAX_PROBES 10
-#define SERIAL_BAUD 9600
+#define ONE_WIRE_BUS 2           // OneWire data line on digital pin 2
+#define SENSOR_TIMEOUT 1000      // Milliseconds to wait for sensor response
+#define MAX_SENSORS 10           // Maximum number of sensors to track
+#define READ_INTERVAL 2000       // Milliseconds between sensor reads
+#define RESCAN_INTERVAL 60000    // Milliseconds between rescans (60 seconds)
 
 // ============================================================================
 // GLOBAL VARIABLES
 // ============================================================================
 
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
+OneWire ds(ONE_WIRE_BUS);
+byte found_sensors = 0;
+byte sensor_addresses[MAX_SENSORS][8];
+unsigned long last_read_time = 0;
+unsigned long last_rescan_time = 0;
+unsigned long last_broadcast = 0;
 
-// Store sensor addresses
-DeviceAddress sensorAddresses[MAX_PROBES];
-uint8_t sensorCount = 0;
-
-// Timing
-unsigned long lastSampleTime = 0;
-unsigned long lastRescanTime = 0;
-
-// Temperature resolution (9-12 bits)
-#define TEMPERATURE_PRECISION 12
-
-// FORWARD DECLARATIONS (Function Prototypes)
-// ============================================================================
-
-void scanProbes();
-void readAndTransmitTemperatures();
-void handleSerialCommands();
-void printAddress(DeviceAddress deviceAddress);
+void rescan_sensors();
+void read_all_sensors();
+void handle_serial_command(String command);
+void print_address(byte* addr);
+String format_sensor_address(byte* addr);
+float read_temperature(byte* addr);
+bool start_conversion(byte* addr);
 
 // ============================================================================
 // SETUP
 // ============================================================================
 
-void setup() {
-  Serial.begin(SERIAL_BAUD);
-  delay(100);
+void setup(void) {
+  Serial.begin(9600);
+  delay(1000);
   
-  Serial.println("Temperature Monitoring System Starting...");
-  Serial.print("OneWire Bus on Pin: ");
-  Serial.println(ONE_WIRE_BUS);
-  Serial.print("Sampling Interval: ");
-  Serial.print(SAMPLING_INTERVAL);
-  Serial.println(" ms");
+  // Print startup info
+  Serial.println("[INFO] Temperature Monitoring System Started");
+  Serial.println("[INFO] Searching for OneWire sensors...");
   
-  // Initialize sensors
-  sensors.begin();
-  sensors.setResolution(TEMPERATURE_PRECISION);
-  
-  // Initial scan
-  scanProbes();
-  
-  Serial.println("System Ready!");
+  // Initial sensor scan
+  rescan_sensors();
 }
 
 // ============================================================================
 // MAIN LOOP
 // ============================================================================
 
-void loop() {
+void loop(void) {
+  // Periodic rescan (every 60 seconds)
+  if (millis() - last_rescan_time > RESCAN_INTERVAL) {
+    rescan_sensors();
+    last_rescan_time = millis();
+  }
+  
+  // Read sensors periodically
+  if (millis() - last_read_time > READ_INTERVAL) {
+    read_all_sensors();
+    last_read_time = millis();
+  }
+  
   // Check for serial commands
-  handleSerialCommands();
-  
-  // Periodic rescan (every 10 seconds)
-  if (millis() - lastRescanTime >= RESCAN_INTERVAL) {
-    scanProbes();
-    lastRescanTime = millis();
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    handle_serial_command(command);
   }
   
-  // Periodic temperature sampling and transmission
-  if (millis() - lastSampleTime >= SAMPLING_INTERVAL) {
-    readAndTransmitTemperatures();
-    lastSampleTime = millis();
-  }
+  delay(10);
 }
 
 // ============================================================================
-// PROBE DETECTION & SCANNING
+// SENSOR SCANNING
 // ============================================================================
 
-void scanProbes() {
-  /**
-   * Scan OneWire bus for all connected DS18B20 probes
-   * Auto-detects and addresses them
-   */
+void rescan_sensors(void) {
+  Serial.println("[INFO] Starting sensor rescan...");
   
-  sensorCount = 0;
-  DeviceAddress tempAddress;
+  found_sensors = 0;
+  ds.reset_search();
+  byte addr[8];
   
-  Serial.println("[SCAN] Starting probe detection...");
-  
-  // Scan for all devices on the bus
-  oneWire.reset_search();
-  
-  while (oneWire.search(tempAddress)) {
-    // Verify it's a DS18B20 (family code 0x28)
-    if (tempAddress[0] == 0x28) {
-      if (sensorCount < MAX_PROBES) {
-        // Store address
-        for (int i = 0; i < 8; i++) {
-          sensorAddresses[sensorCount][i] = tempAddress[i];
-        }
-        
-        // Print found probe
-        Serial.print("[SCAN] Probe ");
-        Serial.print(sensorCount + 1);
-        Serial.print(" Address: ");
-        printAddress(tempAddress);
-        Serial.println();
-        
-        sensorCount++;
+  // Search for all OneWire devices
+  while (ds.search(addr)) {
+    if (found_sensors >= MAX_SENSORS) {
+      Serial.println("[WARN] Maximum sensor limit reached, ignoring additional sensors");
+      break;
+    }
+    
+    // Check if it's a DS18B20 (0x28) or DS18S20 (0x10)
+    if (addr[0] == 0x28 || addr[0] == 0x10) {
+      // Store address
+      for (int i = 0; i < 8; i++) {
+        sensor_addresses[found_sensors][i] = addr[i];
       }
+      
+      // Print address
+      Serial.print("[INFO] Found sensor ");
+      Serial.print(found_sensors + 1);
+      Serial.print(": ");
+      print_address(addr);
+      Serial.println();
+      
+      found_sensors++;
+    } else {
+      Serial.print("[WARN] Unknown device type 0x");
+      Serial.println(addr[0], HEX);
     }
   }
   
-  Serial.print("[SCAN] Total probes found: ");
-  Serial.println(sensorCount);
+  // Print summary
+  Serial.print("[INFO] RESCAN_COMPLETE:");
+  Serial.print(found_sensors);
+  Serial.println("_SENSORS_FOUND");
   
-  if (sensorCount == 0) {
-    Serial.println("[WARN] No DS18B20 probes detected! Check connections.");
+  if (found_sensors == 0) {
+    Serial.println("[ERROR] No temperature sensors found on OneWire bus!");
   }
 }
 
 // ============================================================================
-// TEMPERATURE READING & TRANSMISSION
+// SENSOR READING
 // ============================================================================
 
-void readAndTransmitTemperatures() {
-  /**
-   * Read all probe temperatures and transmit via Serial
-   * Format: "28ABC123:25.50,28DEF456:26.75"
-   * This format is parsed by Flask backend
-   */
-  
-  if (sensorCount == 0) {
-    Serial.println("[WARN] No probes available");
+void read_all_sensors(void) {
+  if (found_sensors == 0) {
+    // Only print occasionally to avoid spam
+    if (millis() - last_broadcast > 10000) {
+      Serial.println("[ERROR] No sensors available to read");
+      last_broadcast = millis();
+    }
     return;
   }
   
-  // Request temperature conversion from all sensors (async)
-  sensors.requestTemperatures();
-  delay(10);  // Small delay for conversion
-  
-  // Build transmission string
-  String transmissionData = "";
-  
-  for (int i = 0; i < sensorCount; i++) {
-    // Get temperature
-    float tempC = sensors.getTempC(sensorAddresses[i]);
-    
-    // Handle invalid readings
-    if (tempC == DEVICE_DISCONNECTED_C) {
-      tempC = -999.0;  // Sentinel value for disconnected
-    }
-    
-    // Build address string (28 + hex address)
-    transmissionData += "28";
-    for (int j = 1; j < 8; j++) {  // Skip first byte (family code)
-      if (sensorAddresses[i][j] < 16) transmissionData += "0";
-      transmissionData += String(sensorAddresses[i][j], HEX);
-    }
-    
-    // Add temperature
-    transmissionData += ":";
-    transmissionData += String(tempC, 2);
-    
-    // Add comma separator (except last probe)
-    if (i < sensorCount - 1) {
-      transmissionData += ",";
+  // First pass: issue temperature conversion command to all sensors
+  for (int i = 0; i < found_sensors; i++) {
+    if (!start_conversion(sensor_addresses[i])) {
+      Serial.print("[ERROR] Failed to start conversion for sensor ");
+      Serial.println(i + 1);
     }
   }
   
-  // Transmit to Pi
-  Serial.println(transmissionData);
+  // Wait for conversion to complete (max 750ms for 12-bit)
+  delay(800);
+  
+  // Second pass: read temperatures from all sensors
+  String output = "";
+  bool all_ok = true;
+  
+  for (int i = 0; i < found_sensors; i++) {
+    float temp = read_temperature(sensor_addresses[i]);
+    
+    if (temp == -999.0) {
+      // Read failed
+      Serial.print("[ERROR] CRC_FAILED for sensor ");
+      Serial.println(i + 1);
+      all_ok = false;
+      continue;
+    }
+    
+    // Add to output string
+    if (output.length() > 0) {
+      output += ",";
+    }
+    
+    // Add sensor address and temperature
+    output += format_sensor_address(sensor_addresses[i]);
+    output += ":";
+    output += String(temp, 2);
+  }
+  
+  // Send all temperatures together
+  if (output.length() > 0) {
+    Serial.println(output);
+  } else if (!all_ok) {
+    Serial.println("[ERROR] Failed to read any sensor temperatures");
+  }
+}
+
+bool start_conversion(byte* addr) {
+  ds.reset();
+  ds.select(addr);
+  ds.write(0x44, 1);  // Start temperature conversion
+  return true;
+}
+
+float read_temperature(byte* addr) {
+  byte data[12];
+  
+  // Reset, select, and read scratchpad
+  ds.reset();
+  ds.select(addr);
+  ds.write(0xBE);  // Read scratchpad
+  
+  // Read 9 bytes
+  for (int i = 0; i < 9; i++) {
+    data[i] = ds.read();
+  }
+  
+  // Verify CRC
+  byte crc = OneWire::crc8(data, 8);
+  if (crc != data[8]) {
+    return -999.0;  // CRC error
+  }
+  
+  // Convert raw temperature
+  int16_t raw = (data[1] << 8) | data[0];
+  
+  // Account for resolution setting
+  byte cfg = (data[4] & 0x60);
+  if (cfg == 0x00) raw = raw & ~7;      // 9-bit
+  else if (cfg == 0x20) raw = raw & ~3;  // 10-bit
+  else if (cfg == 0x40) raw = raw & ~1;  // 11-bit
+  
+  float celsius = (float)raw / 16.0;
+  
+  return celsius;
 }
 
 // ============================================================================
 // SERIAL COMMAND HANDLING
 // ============================================================================
 
-void handleSerialCommands() {
-  /**
-   * Handle commands from Raspberry Pi
-   * RESCAN - Force probe rescan
-   * STATUS - Report system status
-   */
+void handle_serial_command(String command) {
+  if (command.length() == 0) {
+    return;
+  }
   
-  if (Serial.available()) {
-    String command = Serial.readStringUntil('\n');
-    command.trim();
-    command.toUpperCase();
-    
-    if (command == "RESCAN") {
-      Serial.println("[CMD] Rescan command received");
-      scanProbes();
-    }
-    else if (command == "STATUS") {
-      Serial.print("[STATUS] Probes: ");
-      Serial.print(sensorCount);
-      Serial.print(", Sampling: ");
-      Serial.print(SAMPLING_INTERVAL);
-      Serial.println("ms");
-    }
-    else if (command.startsWith("INTERVAL:")) {
-      // Format: INTERVAL:5000 (set to 5 seconds)
-      // Note: This would require additional handling to change SAMPLING_INTERVAL dynamically
-      Serial.println("[CMD] Dynamic interval adjustment not yet implemented");
-    }
-    else if (command.startsWith("PRECISION:")) {
-      // Format: PRECISION:11 (set resolution to 11 bits)
-      // Parse and set
-      int newPrecision = command.substring(10).toInt();
-      if (newPrecision >= 9 && newPrecision <= 12) {
-        sensors.setResolution(newPrecision);
-        Serial.print("[CMD] Precision set to ");
-        Serial.print(newPrecision);
-        Serial.println(" bits");
-      }
-    }
-    else {
-      Serial.println("[CMD] Unknown command: " + command);
-    }
+  Serial.print("[INFO] Received command: ");
+  Serial.println(command);
+  
+  if (command == "RESCAN") {
+    rescan_sensors();
+  }
+  else if (command == "STATUS") {
+    Serial.print("[INFO] Found ");
+    Serial.print(found_sensors);
+    Serial.println(" temperature sensor(s)");
+  }
+  else if (command == "TEST") {
+    Serial.println("[INFO] Test message - System is responding");
+  }
+  else {
+    Serial.print("[WARN] Unknown command: ");
+    Serial.println(command);
   }
 }
 
@@ -240,55 +263,56 @@ void handleSerialCommands() {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-void printAddress(DeviceAddress deviceAddress) {
-  /**
-   * Print a device address in hex format
-   * Example: 28AB3C500415124B
-   */
-  for (uint8_t i = 0; i < 8; i++) {
-    if (deviceAddress[i] < 16) Serial.print("0");
-    Serial.print(deviceAddress[i], HEX);
+void print_address(byte* addr) {
+  for (int i = 0; i < 8; i++) {
+    if (addr[i] < 16) {
+      Serial.print("0");
+    }
+    Serial.print(addr[i], HEX);
   }
 }
 
+String format_sensor_address(byte* addr) {
+  String result = "";
+  for (int i = 0; i < 8; i++) {
+    if (addr[i] < 16) {
+      result += "0";
+    }
+    result += String(addr[i], HEX);
+  }
+  return result;
+}
+
 // ============================================================================
-// NOTES FOR CUSTOMIZATION
+// EXAMPLE MESSAGE FORMATS
 // ============================================================================
 
 /*
- * PIN CONFIGURATION:
- * - Change ONE_WIRE_BUS to use different Arduino pin
- * - Example: #define ONE_WIRE_BUS 3 for pin 3
+ * The system sends various message types for debugging:
  * 
- * SAMPLING INTERVAL:
- * - Adjust SAMPLING_INTERVAL to change read frequency
- * - Minimum: 1000ms (1 second) - respects DS18B20 conversion time
- * - Default: 2000ms (2 seconds)
+ * TEMPERATURE DATA:
+ * 281234567890ab:25.50,289876543210cd:26.30
  * 
- * TEMPERATURE RESOLUTION:
- * - 9-bit:  93.75ms conversion time
- * - 10-bit: 187.5ms conversion time
- * - 11-bit: 375ms conversion time
- * - 12-bit: 750ms conversion time (maximum precision)
- * - Current: 12-bit (TEMPERATURE_PRECISION = 12)
+ * INFO MESSAGES:
+ * [INFO] Temperature Monitoring System Started
+ * [INFO] Found sensor 1: 281234567890ab
+ * [INFO] RESCAN_COMPLETE:2_SENSORS_FOUND
+ * [INFO] Received command: RESCAN
+ * [INFO] Found 2 temperature sensor(s)
+ * [INFO] Test message - System is responding
  * 
- * TROUBLESHOOTING:
- * 1. No probes detected:
- *    - Check OneWire resistor (4.7k between data and +5V)
- *    - Verify DS18B20 power (VDD to +5V, GND to GND)
- *    - Check data line connections
+ * WARNING MESSAGES:
+ * [WARN] Maximum sensor limit reached
+ * [WARN] Unknown device type 0x01
+ * [WARN] Unknown command: INVALID
  * 
- * 2. Intermittent readings:
- *    - Increase pull-up resistor if line is long (6.8k-10k)
- *    - Check for electromagnetic interference
- *    - Reduce cable length or shield cables
+ * ERROR MESSAGES:
+ * [ERROR] No temperature sensors found on OneWire bus!
+ * [ERROR] Failed to start conversion for sensor 1
+ * [ERROR] CRC_FAILED for sensor 1
+ * [ERROR] Failed to read any sensor temperatures
+ * [ERROR] No sensors available to read
  * 
- * 3. Inaccurate temperatures:
- *    - Verify TEMPERATURE_PRECISION setting
- *    - Allow more time for conversion (increase SAMPLING_INTERVAL)
- * 
- * EXPANDING BEYOND 10 PROBES:
- * - Change MAX_PROBES to 20 (uses more RAM)
- * - Arduino UNO RAM: 2KB (limited to ~15-20 devices)
- * - Consider Arduino Mega for more devices
+ * All messages are tagged with timestamp on the Raspberry Pi side
+ * and stored in the Serial Monitor for debugging.
  */
