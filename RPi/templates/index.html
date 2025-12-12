@@ -1,244 +1,1368 @@
-# v6.4 UPDATE - Per-Sensor Temperature Delta from Overall Average
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Monitoring System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .status-bar {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+        }
+        
+        .status-indicator.offline {
+            background: #f44336;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #ddd;
+            overflow-x: auto;
+            padding-bottom: 0;
+        }
+        
+        .tab-btn {
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        .tab-btn:hover {
+            color: #667eea;
+            background: #f9f9f9;
+        }
+        
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        
+        .card h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .sensors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .sensor-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .sensor-card .name {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+        
+        .sensor-card .temperature {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .sensor-card .status {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .sensor-card.offline {
+            background: linear-gradient(135deg, #999 0%, #666 100%);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .btn-primary.active {
+            background: #f44336;
+        }
+        
+        .btn-primary.active:hover {
+            background: #d32f2f;
+        }
+        
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .status-message {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .status-message.success {
+            background: #c8e6c9;
+            color: #2e7d32;
+            display: block;
+        }
+        
+        .status-message.error {
+            background: #ffcdd2;
+            color: #c62828;
+            display: block;
+        }
+        
+        .status-message.info {
+            background: #bbdefb;
+            color: #1565c0;
+            display: block;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        
+        .logging-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .logging-control-group {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        
+        .probe-rename-form {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .per-sensor-stat-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .stat-card-header h4 {
+            margin: 0;
+            color: #667eea;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .stat-badge {
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-value.positive {
+            color: #f44336;
+        }
+        
+        .stat-value.negative {
+            color: #4CAF50;
+        }
+        
+        .stat-value.neutral {
+            color: #999;
+        }
+        
+        .delta-indicator {
+            font-size: 12px;
+            font-weight: 500;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-top: 4px;
+        }
+        
+        .delta-indicator.above {
+            background: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+        }
+        
+        .delta-indicator.below {
+            background: rgba(76, 175, 80, 0.1);
+            color: #4CAF50;
+        }
+        
+        .delta-indicator.equal {
+            background: rgba(153, 153, 153, 0.1);
+            color: #999;
+        }
+        
+        .serial-monitor {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 450px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            line-height: 1.5;
+        }
+        
+        .monitor-line {
+            margin: 2px 0;
+            padding: 3px 5px;
+            word-break: break-word;
+        }
+        
+        .monitor-line.temperature {
+            color: #4ec9b0;
+        }
+        
+        .monitor-line.info {
+            color: #569cd6;
+        }
+        
+        .monitor-line.warning {
+            color: #ce9178;
+        }
+        
+        .monitor-line.error {
+            color: #f48771;
+        }
+        
+        .monitor-line.unknown {
+            color: #858585;
+        }
+        
+        .monitor-line.raw {
+            color: #d4d4d4;
+        }
+        
+        .monitor-timestamp {
+            color: #666;
+            font-size: 10px;
+            margin-right: 8px;
+        }
+        
+        .monitor-type {
+            color: #999;
+            font-size: 10px;
+            margin-right: 8px;
+        }
+        
+        .serial-filter-wrapper {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .serial-filter-wrapper select {
+            padding: 10px 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .serial-legend {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .serial-legend span {
+            margin-right: 20px;
+            display: inline-block;
+        }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-dialog {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .modal-body {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        @media (max-width: 768px) {
+            .sensors-grid {
+                grid-template-columns: 1fr;
+            }
+            .logging-controls {
+                grid-template-columns: 1fr;
+            }
+            .button-group {
+                flex-direction: column;
+            }
+            .button-group button,
+            .button-group select {
+                width: 100%;
+            }
+            .tabs {
+                flex-direction: row;
+            }
+            .probe-rename-form {
+                grid-template-columns: 1fr;
+            }
+            .stat-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Temperature Monitoring System</h1>
+            <p>Real-time sensor data monitoring and logging</p>
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-indicator" id="serialStatus"></div>
+                    <span id="serialStatusText">Connecting...</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-indicator" id="systemStatus"></div>
+                    <span id="systemStatusText">System Status</span>
+                </div>
+            </div>
+        </header>
 
-## 🎉 What's New
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('sensors')">Sensors</button>
+            <button class="tab-btn" onclick="switchTab('logging')">Data Logging</button>
+            <button class="tab-btn" onclick="switchTab('graphs')">Historical Graphs</button>
+            <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+            <button class="tab-btn" onclick="switchTab('serialmonitor')">Serial Monitor</button>
+        </div>
 
-In the **Historical Graphs** tab, per-sensor statistics now show **how much each sensor deviates from the overall average temperature**.
+        <!-- SENSORS TAB -->
+        <div id="sensors" class="tab-content active">
+            <div class="card">
+                <h2>Current Sensor Readings</h2>
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="rescanSensors()">Rescan Sensors</button>
+                    <button class="btn btn-secondary" onclick="refreshSensors()">Refresh Now</button>
+                    <button class="btn btn-primary" id="mockModeToggle" onclick="toggleMockMode()">Mock Mode OFF</button>
+                </div>
+                <div id="statusMessage" class="status-message"></div>
+                <div class="sensors-grid" id="sensorsGrid">
+                    <div class="sensor-card">
+                        <div class="name">Loading...</div>
+                        <div class="temperature">--°C</div>
+                        <div class="status">Waiting for data</div>
+                    </div>
+                </div>
+            </div>
 
-### Visual Indicators
-- **↑ Warmer** (Red) - Sensor is hotter than overall average
-- **↓ Cooler** (Green) - Sensor is cooler than overall average  
-- **≈ Same** (Gray) - Sensor is at overall average
+            <div class="card">
+                <h2>Probe Management</h2>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Rename or delete your temperature probes.</p>
+                <div id="renameForm"></div>
+            </div>
+        </div>
 
-### Example
-```
-Overall Session Average: 22.50°C
+        <!-- LOGGING TAB -->
+        <div id="logging" class="tab-content">
+            <div class="card">
+                <h2>Data Logging Control</h2>
+                <div class="button-group">
+                    <button class="btn btn-primary" id="startLoggingBtn" onclick="startLogging()">Start Logging</button>
+                    <button class="btn btn-danger" id="stopLoggingBtn" onclick="stopLogging()" disabled>Stop Logging</button>
+                </div>
+                <div class="logging-controls">
+                    <div class="logging-control-group">
+                        <div class="form-group">
+                            <label>Session Duration (minutes)</label>
+                            <input type="number" id="logDuration" min="1" max="1440" value="60" placeholder="Leave empty for unlimited">
+                        </div>
+                    </div>
+                    <div class="logging-control-group">
+                        <div class="form-group">
+                            <label>Logging Interval (seconds)</label>
+                            <input type="number" id="logInterval" min="1" max="300" value="60" placeholder="Time between readings">
+                        </div>
+                    </div>
+                    <div class="logging-control-group">
+                        <div class="form-group">
+                            <label>Log File Storage Location</label>
+                            <input type="text" id="logFolder" placeholder="/home/pi/temperature_logs/" value="/home/pi/temperature_logs/">
+                        </div>
+                    </div>
+                    <div class="logging-control-group">
+                        <div class="form-group">
+                            <label>Logging Status</label>
+                            <input type="text" id="loggingStatus" readonly value="Stopped">
+                        </div>
+                    </div>
+                </div>
+                <div id="statusMessageLogging" class="status-message"></div>
+            </div>
+        </div>
 
-Living Room:
-├─ Average: 23.15°C
-├─ vs Overall Avg: +0.65°C ↑ Warmer (red)
-└─ Meaning: 0.65°C warmer than the building average
+        <!-- GRAPHS TAB -->
+        <div id="graphs" class="tab-content">
+            <div class="card">
+                <h2>Historical Temperature Data</h2>
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="loadGraphData()">Load Data</button>
+                    <button class="btn btn-secondary" onclick="downloadGraphData()">Download CSV</button>
+                </div>
+                <div id="statusMessageGraphs" class="status-message"></div>
+                <div id="sessionSelector" style="display: none; margin-bottom: 20px;">
+                    <label for="sessionSelect">Select Session</label>
+                    <select id="sessionSelect" onchange="displayGraph()" style="margin-top: 10px;">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                <div class="chart-container">
+                    <canvas id="temperatureChart"></canvas>
+                </div>
+                <div id="graphStats" style="display: none;">
+                    <h3>Overall Statistics</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #f0f0f0;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 4px;">
+                            <div style="font-size: 12px; opacity: 0.9;">Min Temperature</div>
+                            <div style="font-size: 20px; font-weight: bold; margin-top: 8px;" id="statMin">--°C</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 4px;">
+                            <div style="font-size: 12px; opacity: 0.9;">Max Temperature</div>
+                            <div style="font-size: 20px; font-weight: bold; margin-top: 8px;" id="statMax">--°C</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 4px;">
+                            <div style="font-size: 12px; opacity: 0.9;">Average Temperature</div>
+                            <div style="font-size: 20px; font-weight: bold; margin-top: 8px;" id="statAvg">--°C</div>
+                        </div>
+                    </div>
+                    <h3 style="margin-top: 30px;">Per-Sensor Statistics</h3>
+                    <div id="perSensorStats" style="margin-top: 15px;">
+                    </div>
+                </div>
+            </div>
+        </div>
 
-Kitchen:
-├─ Average: 22.50°C
-├─ vs Overall Avg: 0.00°C ≈ Same (gray)
-└─ Meaning: Right at building average
+        <!-- SETTINGS TAB -->
+        <div id="settings" class="tab-content">
+            <div class="card">
+                <h2>System Settings</h2>
+                <div class="form-group">
+                    <label>Auto-refresh Interval (seconds)</label>
+                    <input type="number" id="refreshInterval" min="1" max="60" value="2">
+                </div>
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+            </div>
+            <div class="card">
+                <h2>System Information</h2>
+                <div id="systemInfo" style="background: #f9f9f9; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 12px; line-height: 1.6;">
+                    <div>System State: <span id="infoSystemState">--</span></div>
+                    <div>Logging State: <span id="infoLoggingState">--</span></div>
+                    <div>Serial Connected: <span id="infoSerialConnected">--</span></div>
+                    <div>Last Update: <span id="infoLastUpdate">--</span></div>
+                </div>
+            </div>
+        </div>
 
-Basement:
-├─ Average: 21.50°C
-├─ vs Overall Avg: -1.00°C ↓ Cooler (green)
-└─ Meaning: 1°C cooler than building average
-```
+        <!-- SERIAL MONITOR TAB -->
+        <div id="serialmonitor" class="tab-content">
+            <div class="card">
+                <h2>Serial Monitor</h2>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">View all incoming serial data from Arduino.</p>
+                <div class="serial-filter-wrapper">
+                    <button class="btn btn-secondary" id="pauseResumeBtn" onclick="toggleSerialMonitor()">Pause</button>
+                    <select id="serialFilter" onchange="updateSerialMonitor()">
+                        <option value="">All Messages</option>
+                        <option value="temperature">Temperature Data</option>
+                        <option value="info">Info Only</option>
+                        <option value="warning">Warnings Only</option>
+                        <option value="error">Errors Only</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="downloadSerialLog()">Download Log</button>
+                    <button class="btn btn-danger" onclick="clearSerialMonitor()">Clear</button>
+                </div>
+                <div class="serial-monitor" id="serialMonitor">
+                    <div class="monitor-line info">Waiting for serial data...</div>
+                </div>
+                <div class="serial-legend">
+                    <strong>Legend:</strong>
+                    <span style="color: #4ec9b0;">Temperature Data</span>
+                    <span style="color: #569cd6;">Info Messages</span>
+                    <span style="color: #ce9178;">Warnings</span>
+                    <span style="color: #f48771;">Errors</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
----
+    <!-- DELETE CONFIRMATION MODAL -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal-dialog">
+            <div class="modal-header">Confirm Delete</div>
+            <div class="modal-body">
+                Are you sure you want to delete <strong id="deleteModalSensorName"></strong>?
+                <br><br>
+                This sensor will be removed from the system.
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="confirmDelete()">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
 
-## 📊 Display Details
+    <script>
+        const API_BASE = '/api';
+        let refreshIntervalMs = 2000;
+        let autoRefreshTimer = null;
+        let graphChart = null;
+        let serialMonitorPaused = false;
+        let serialMonitorInterval = null;
+        let mockModeEnabled = false;
+        let pendingDeleteSensorId = null;
 
-### Per-Sensor Statistics Card (New)
-Each sensor now shows:
+        function switchTab(tabName) {
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            const btns = document.querySelectorAll('.tab-btn');
+            btns.forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tabName === 'serialmonitor') {
+                startSerialMonitor();
+            } else if (serialMonitorInterval) {
+                clearInterval(serialMonitorInterval);
+                serialMonitorInterval = null;
+            }
+            
+            if (tabName === 'sensors') {
+                refreshSensors();
+            } else if (tabName === 'logging') {
+                updateLoggingStatus();
+            } else if (tabName === 'graphs') {
+                loadGraphData();
+            } else if (tabName === 'settings') {
+                updateSystemInfo();
+            }
+        }
 
-1. **Minimum** - Coldest reading for this sensor
-2. **Maximum** - Hottest reading for this sensor
-3. **Average** - Mean temperature for this sensor
-4. **Range** - Difference between min and max
-5. **Vs Overall Avg** ← **NEW** - Delta from building average
-   - Red arrow (↑) if warmer
-   - Green arrow (↓) if cooler
-   - Gray line (≈) if about the same
+        function showStatus(message, type = 'info', elementId = 'statusMessage') {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = 'status-message ' + type;
+            setTimeout(() => { el.className = 'status-message'; }, 5000);
+        }
 
-### Example Card
-```
-┌─────────────────────────────────┐
-│ LIVING ROOM                     │
-├─────────────────────────────────┤
-│ Minimum    │ Maximum   │ Average │
-│  21.50°C   │  24.80°C  │ 23.15°C │
-├─────────────────────────────────┤
-│ Range              │ Vs Overall  │
-│  3.30°C            │  +0.65°C    │
-│                    │  ↑ Warmer   │
-└─────────────────────────────────┘
-```
+        function updateSystemStatus() {
+            fetch(API_BASE + '/system/status')
+                .then(r => r.json())
+                .then(data => {
+                    const statusEl = document.getElementById('systemStatus');
+                    const statusText = document.getElementById('systemStatusText');
+                    statusEl.className = data.serial_connected ? 'status-indicator' : 'status-indicator offline';
+                    statusText.textContent = data.serial_connected ? 'Arduino Connected' : 'Arduino Offline';
+                    
+                    const newMockState = data.mock_mode || false;
+                    if (newMockState !== mockModeEnabled) {
+                        mockModeEnabled = newMockState;
+                        updateMockModeButton();
+                    }
+                })
+                .catch(err => console.error('Status update error:', err));
+        }
 
----
+        function refreshSensors() {
+            fetch(API_BASE + '/sensors')
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(data => {
+                    const grid = document.getElementById('sensorsGrid');
+                    let sensors = data.sensors || {};
+                    
+                    if (!sensors || Object.keys(sensors).length === 0) {
+                        grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">No sensors detected. Try rescanning.</div>`;
+                        document.getElementById('renameForm').innerHTML = '';
+                        return;
+                    }
+                    
+                    grid.innerHTML = Object.entries(sensors)
+                        .map(([id, sensor]) => `
+                            <div class="sensor-card ${sensor.status === 'offline' ? 'offline' : ''}">
+                                <div class="name">${sensor.name}</div>
+                                <div class="temperature">${sensor.status === 'online' ? sensor.temperature.toFixed(2) : '--'}°C</div>
+                                <div class="status">${sensor.status === 'online' ? 'Online' : 'Offline'}</div>
+                            </div>
+                        `)
+                        .join('');
+                    
+                    const renameForm = document.getElementById('renameForm');
+                    if (!renameForm.innerHTML || renameForm.innerHTML.trim() === '') {
+                        renameForm.innerHTML = Object.entries(sensors)
+                            .map(([id, sensor]) => `
+                                <div class="probe-rename-form">
+                                    <input type="text" id="rename${id}" value="${sensor.name}" placeholder="Probe name">
+                                    <button class="btn btn-primary" onclick="renameSensor('${id}')">Rename</button>
+                                    <button class="btn btn-danger" onclick="deleteSensorConfirm('${id}', '${sensor.name}')">Delete</button>
+                                </div>
+                            `)
+                            .join('');
+                    }
+                })
+                .catch(err => {
+                    console.error('Sensor refresh error:', err);
+                    showStatus('Error loading sensors', 'error');
+                });
+        }
 
-## 🎨 Color Coding
+        function rescanSensors() {
+            fetch(API_BASE + '/probes/rescan', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    showStatus('Rescan initiated', 'success');
+                    setTimeout(refreshSensors, 1000);
+                })
+                .catch(err => {
+                    console.error('Rescan error:', err);
+                    showStatus('Error during rescan', 'error');
+                });
+        }
 
-| Delta | Color | Icon | Meaning |
-|-------|-------|------|---------|
-| > +0.05°C | Red | ↑ | Warmer than average |
-| -0.05 to +0.05°C | Gray | ≈ | At average |
-| < -0.05°C | Green | ↓ | Cooler than average |
+        function renameSensor(sensorId) {
+            const newName = document.getElementById('rename' + sensorId).value;
+            if (!newName.trim()) {
+                showStatus('Please enter a name', 'error');
+                return;
+            }
+            
+            fetch(API_BASE + '/probes/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sensor_id: sensorId, name: newName })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    showStatus('Probe renamed successfully', 'success');
+                    setTimeout(() => {
+                        document.getElementById('renameForm').innerHTML = '';
+                        refreshSensors();
+                    }, 300);
+                })
+                .catch(err => {
+                    console.error('Rename error:', err);
+                    showStatus('Error renaming probe: ' + err.message, 'error');
+                });
+        }
 
-Threshold of ±0.05°C prevents false positives from sensor noise.
+        function deleteSensorConfirm(sensorId, sensorName) {
+            pendingDeleteSensorId = sensorId;
+            document.getElementById('deleteModalSensorName').textContent = sensorName;
+            document.getElementById('deleteModal').classList.add('active');
+        }
 
----
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+            pendingDeleteSensorId = null;
+        }
 
-## 📈 Use Cases
+        function confirmDelete() {
+            if (!pendingDeleteSensorId) return;
+            
+            fetch(API_BASE + '/probes/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sensor_id: pendingDeleteSensorId })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    showStatus('Probe deleted successfully', 'success');
+                    closeDeleteModal();
+                    setTimeout(() => {
+                        document.getElementById('renameForm').innerHTML = '';
+                        refreshSensors();
+                    }, 300);
+                })
+                .catch(err => {
+                    console.error('Delete error:', err);
+                    showStatus('Error deleting probe: ' + err.message, 'error');
+                    closeDeleteModal();
+                });
+        }
 
-### 1. Identify Problem Areas
-Find rooms that are consistently warmer/cooler:
-```
-Attic: +2.5°C warmer (poor insulation? sun exposure?)
-Basement: -1.8°C cooler (needs insulation?)
-Living Room: +0.3°C normal (good)
-```
+        function toggleMockMode() {
+            const btn = document.getElementById('mockModeToggle');
+            btn.disabled = true;
+            
+            if (mockModeEnabled) {
+                showStatus('Disabling mock mode...', 'info');
+                fetch(API_BASE + '/mock/disable', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        mockModeEnabled = false;
+                        updateMockModeButton();
+                        showStatus('Mock mode disabled - fake sensors removed', 'success');
+                        setTimeout(refreshSensors, 500);
+                    })
+                    .catch(err => {
+                        console.error('Mock disable error:', err);
+                        showStatus('Error disabling mock mode', 'error');
+                        btn.disabled = false;
+                    });
+            } else {
+                showStatus('Enabling mock mode...', 'info');
+                fetch(API_BASE + '/mock/enable', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        mockModeEnabled = true;
+                        updateMockModeButton();
+                        showStatus('Mock mode enabled', 'success');
+                        setTimeout(() => refreshSensors(), 1000);
+                    })
+                    .catch(err => {
+                        console.error('Mock enable error:', err);
+                        showStatus('Error enabling mock mode', 'error');
+                        btn.disabled = false;
+                    });
+            }
+        }
 
-### 2. HVAC Effectiveness
-Check if heating/cooling is evenly distributed:
-```
-If Kitchen is +2°C and Bedroom is -2°C → Imbalanced system
-If all within ±0.5°C → Well-balanced
-```
+        function updateMockModeButton() {
+            const btn = document.getElementById('mockModeToggle');
+            if (mockModeEnabled) {
+                btn.textContent = 'Mock Mode ON';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = 'Mock Mode OFF';
+                btn.classList.remove('active');
+            }
+            btn.disabled = false;
+        }
 
-### 3. Comfort Analysis
-Track temperature consistency:
-```
-High variance (±1.5°C) → Drafts, poor insulation
-Low variance (±0.3°C) → Good temperature control
-```
+        function startLogging() {
+            const duration = document.getElementById('logDuration').value;
+            const interval = document.getElementById('logInterval').value;
+            const folder = document.getElementById('logFolder').value;
+            
+            const durationSec = duration ? parseInt(duration) * 60 : null;
+            const intervalSec = interval ? parseInt(interval) : 60;
+            
+            fetch(API_BASE + '/logging/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ duration: durationSec, interval: intervalSec, folder: folder })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    showStatus('Logging started: ' + data.filename, 'success', 'statusMessageLogging');
+                    document.getElementById('startLoggingBtn').disabled = true;
+                    document.getElementById('stopLoggingBtn').disabled = false;
+                    document.getElementById('loggingStatus').value = 'Logging...';
+                    updateLoggingStatus();
+                })
+                .catch(err => {
+                    console.error('Logging start error:', err);
+                    showStatus('Error starting logging', 'error', 'statusMessageLogging');
+                });
+        }
 
-### 4. Energy Optimization
-Find where to focus improvements:
-```
-Consistently cold rooms → Add insulation
-Consistently hot rooms → Improve ventilation
-```
+        function stopLogging() {
+            fetch(API_BASE + '/logging/stop', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    showStatus('Logging stopped: ' + data.filename, 'success', 'statusMessageLogging');
+                    document.getElementById('startLoggingBtn').disabled = false;
+                    document.getElementById('stopLoggingBtn').disabled = true;
+                    document.getElementById('loggingStatus').value = 'Stopped';
+                })
+                .catch(err => {
+                    console.error('Logging stop error:', err);
+                    showStatus('Error stopping logging', 'error', 'statusMessageLogging');
+                });
+        }
 
----
+        function updateLoggingStatus() {
+            fetch(API_BASE + '/system/status')
+                .then(r => r.json())
+                .then(data => {
+                    const isLogging = data.logging_state === 'logging';
+                    document.getElementById('startLoggingBtn').disabled = isLogging;
+                    document.getElementById('stopLoggingBtn').disabled = !isLogging;
+                    document.getElementById('loggingStatus').value = isLogging ? 'Logging...' : 'Stopped';
+                })
+                .catch(err => console.error('Logging status error:', err));
+        }
 
-## 🔧 Technical Details
+        function loadGraphData() {
+            fetch(API_BASE + '/graphs/data')
+                .then(r => r.json())
+                .then(data => {
+                    const sessions = data.sessions;
+                    const files = data.files;
+                    
+                    if (files.length === 0) {
+                        showStatus('No logged data available', 'info', 'statusMessageGraphs');
+                        return;
+                    }
+                    
+                    const selector = document.getElementById('sessionSelector');
+                    const select = document.getElementById('sessionSelect');
+                    select.innerHTML = files.map(f => `<option value="${f}">${f}</option>`).join('');
+                    selector.style.display = 'block';
+                    displayGraph();
+                    showStatus('Data loaded', 'success', 'statusMessageGraphs');
+                })
+                .catch(err => {
+                    console.error('Graph data error:', err);
+                    showStatus('Error loading graph data', 'error', 'statusMessageGraphs');
+                });
+        }
 
-### Calculation
-```javascript
-overallAverage = sum of all temperatures / count of all temperatures
+        function displayGraph() {
+            const sessionFile = document.getElementById('sessionSelect').value;
+            if (!sessionFile) return;
+            
+            fetch(API_BASE + '/graphs/data?file=' + sessionFile)
+                .then(r => r.json())
+                .then(data => {
+                    const sessions = data.sessions;
+                    const sessionData = sessions[sessionFile];
+                    
+                    if (sessionData.length === 0) {
+                        showStatus('No data in session', 'info', 'statusMessageGraphs');
+                        return;
+                    }
+                    
+                    const sensorIds = new Set();
+                    sessionData.forEach(item => {
+                        Object.keys(item.readings).forEach(id => sensorIds.add(id));
+                    });
+                    
+                    const labels = sessionData.map(item => {
+                        const time = new Date(item.timestamp);
+                        return time.toLocaleTimeString();
+                    });
+                    
+                    const colors = ['#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff'];
+                    const datasets = [];
+                    
+                    Array.from(sensorIds).forEach((sensorId, idx) => {
+                        datasets.push({
+                            label: sensorId.substring(0, 8),
+                            data: sessionData.map(item => item.readings[sensorId] || null),
+                            borderColor: colors[idx % colors.length],
+                            tension: 0.1,
+                            fill: false
+                        });
+                    });
+                    
+                    if (graphChart) graphChart.destroy();
+                    const ctx = document.getElementById('temperatureChart').getContext('2d');
+                    graphChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, position: 'bottom' }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    title: { display: true, text: 'Temperature °C' }
+                                }
+                            }
+                        }
+                    });
+                    
+                    const allTemps = [];
+                    const sensorStats = {};
+                    
+                    sessionData.forEach(item => {
+                        Object.entries(item.readings).forEach(([sensorId, temp]) => {
+                            if (temp !== null) {
+                                allTemps.push(temp);
+                                if (!sensorStats[sensorId]) sensorStats[sensorId] = { temps: [], name: sensorId.substring(0, 8).toUpperCase() };
+                                sensorStats[sensorId].temps.push(temp);
+                            }
+                        });
+                    });
+                    
+                    if (allTemps.length > 0) {
+                        const min = Math.min(...allTemps);
+                        const max = Math.max(...allTemps);
+                        const overallAvg = (allTemps.reduce((a, b) => a + b) / allTemps.length).toFixed(2);
+                        
+                        document.getElementById('statMin').textContent = min.toFixed(2) + ' °C';
+                        document.getElementById('statMax').textContent = max.toFixed(2) + ' °C';
+                        document.getElementById('statAvg').textContent = overallAvg + ' °C';
+                        
+                        const perSensorHtml = Object.entries(sensorStats)
+                            .map(([sensorId, stats]) => {
+                                const temps = stats.temps;
+                                const sensorMin = Math.min(...temps);
+                                const sensorMax = Math.max(...temps);
+                                const sensorAvg = (temps.reduce((a, b) => a + b) / temps.length).toFixed(2);
+                                const readings = temps.length;
+                                
+                                const deltaFromOverallAvg = (parseFloat(sensorAvg) - parseFloat(overallAvg)).toFixed(2);
+                                const absDelta = Math.abs(deltaFromOverallAvg);
+                                
+                                let deltaColor, deltaClass, deltaSign;
+                                if (deltaFromOverallAvg > 0.05) {
+                                    deltaColor = '#f44336';
+                                    deltaClass = 'positive above';
+                                    deltaSign = '+';
+                                } else if (deltaFromOverallAvg < -0.05) {
+                                    deltaColor = '#4CAF50';
+                                    deltaClass = 'negative below';
+                                    deltaSign = '';
+                                } else {
+                                    deltaColor = '#999';
+                                    deltaClass = 'neutral equal';
+                                    deltaSign = '';
+                                }
+                                
+                                return `
+                                    <div class="per-sensor-stat-card">
+                                        <div class="stat-card-header">
+                                            <h4>${stats.name}</h4>
+                                            <span class="stat-badge">${readings} readings</span>
+                                        </div>
+                                        <div class="stat-grid">
+                                            <div class="stat-item">
+                                                <div class="stat-label">Minimum</div>
+                                                <div class="stat-value">${sensorMin.toFixed(2)}°C</div>
+                                            </div>
+                                            <div class="stat-item">
+                                                <div class="stat-label">Maximum</div>
+                                                <div class="stat-value">${sensorMax.toFixed(2)}°C</div>
+                                            </div>
+                                            <div class="stat-item">
+                                                <div class="stat-label">Average</div>
+                                                <div class="stat-value">${sensorAvg}°C</div>
+                                            </div>
+                                            <div class="stat-item">
+                                                <div class="stat-label">Range</div>
+                                                <div class="stat-value">${(sensorMax - sensorMin).toFixed(2)}°C</div>
+                                            </div>
+                                            <div class="stat-item">
+                                                <div class="stat-label">Vs Overall Avg</div>
+                                                <div class="stat-value ${deltaClass}">${deltaSign}${absDelta}°C</div>
+                                                <div class="delta-indicator ${deltaClass === 'positive above' ? 'above' : (deltaClass === 'negative below' ? 'below' : 'equal')}">
+                                                    ${deltaFromOverallAvg > 0.05 ? '↑ Warmer' : (deltaFromOverallAvg < -0.05 ? '↓ Cooler' : '≈ Same')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            })
+                            .join('');
+                        
+                        document.getElementById('perSensorStats').innerHTML = perSensorHtml;
+                        document.getElementById('graphStats').style.display = 'block';
+                    }
+                })
+                .catch(err => {
+                    console.error('Display graph error:', err);
+                    showStatus('Error displaying graph', 'error', 'statusMessageGraphs');
+                });
+        }
 
-For each sensor:
-  sensorAverage = sum of sensor temps / count of sensor readings
-  deltaFromAverage = sensorAverage - overallAverage
-  
-  If delta > 0.05:  "↑ Warmer" (Red)
-  If delta < -0.05: "↓ Cooler" (Green)
-  Else:             "≈ Same" (Gray)
-```
+        function downloadGraphData() {
+            window.location.href = API_BASE + '/graphs/download';
+        }
 
-### Example Calculation
-```
-Session readings:
-├─ Room A: 20°C, 21°C, 22°C (avg: 21°C)
-├─ Room B: 23°C, 24°C, 25°C (avg: 24°C)
-└─ Room C: 21°C, 22°C, 23°C (avg: 22°C)
+        function startSerialMonitor() {
+            if (serialMonitorInterval) clearInterval(serialMonitorInterval);
+            serialMonitorInterval = setInterval(() => {
+                if (!serialMonitorPaused) updateSerialMonitor();
+            }, 500);
+            updateSerialMonitor();
+        }
 
-Overall average: (21 + 24 + 22) / 3 = 22.33°C
+        function updateSerialMonitor() {
+            const filter = document.getElementById('serialFilter')?.value;
+            const url = filter ? API_BASE + '/serial/messages?type=' + filter : API_BASE + '/serial/messages';
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    const monitor = document.getElementById('serialMonitor');
+                    const messages = data.messages;
+                    
+                    if (messages.length === 0) {
+                        monitor.innerHTML = `<div class="monitor-line info">Waiting for serial data...</div>`;
+                        return;
+                    }
+                    
+                    monitor.innerHTML = messages
+                        .map(msg => {
+                            const time = new Date(msg.timestamp * 1000);
+                            const timeStr = time.toLocaleTimeString();
+                            const typeClass = msg.type || 'unknown';
+                            const typeStr = (msg.type || 'unknown').toUpperCase();
+                            return `<div class="monitor-line ${typeClass}"><span class="monitor-timestamp">${timeStr}</span><span class="monitor-type">[${typeStr}]</span>${escapeHtml(msg.message)}</div>`;
+                        })
+                        .join('');
+                    monitor.scrollTop = monitor.scrollHeight;
+                })
+                .catch(err => {
+                    console.error('Serial monitor error:', err);
+                    const monitor = document.getElementById('serialMonitor');
+                    monitor.innerHTML = `<div class="monitor-line error">Error loading serial data: ${err.message}</div>`;
+                });
+        }
 
-Room A: 21°C - 22.33°C = -1.33°C ↓ Cooler
-Room B: 24°C - 22.33°C = +1.67°C ↑ Warmer
-Room C: 22°C - 22.33°C = -0.33°C ↓ Cooler
-```
+        function toggleSerialMonitor() {
+            serialMonitorPaused = !serialMonitorPaused;
+            const btn = document.getElementById('pauseResumeBtn');
+            btn.textContent = serialMonitorPaused ? 'Resume' : 'Pause';
+            btn.style.background = serialMonitorPaused ? '#f44336' : '#e0e0e0';
+            btn.style.color = serialMonitorPaused ? 'white' : '#333';
+        }
 
----
+        function clearSerialMonitor() {
+            if (!confirm('Clear all serial messages? This cannot be undone.')) return;
+            fetch(API_BASE + '/serial/messages', { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        updateSerialMonitor();
+                        showStatus('Serial monitor cleared', 'success');
+                    }
+                })
+                .catch(() => showStatus('Error clearing serial monitor', 'error'));
+        }
 
-## 💡 Interpreting the Data
+        function downloadSerialLog() {
+            fetch(API_BASE + '/serial/messages')
+                .then(r => r.json())
+                .then(data => {
+                    const messages = data.messages;
+                    if (messages.length === 0) {
+                        showStatus('No messages to download', 'info');
+                        return;
+                    }
+                    const lines = messages.map(msg => {
+                        const time = new Date(msg.timestamp * 1000).toISOString();
+                        const type = (msg.type || 'unknown').toUpperCase();
+                        return `${time} [${type}] ${msg.message}`;
+                    }).join('\n');
+                    
+                    const blob = new Blob([lines], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'serial-log-' + Date.now() + '.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showStatus('Downloaded ' + messages.length + ' messages', 'success');
+                })
+                .catch(() => showStatus('Error downloading log', 'error'));
+        }
 
-### Example Session Report
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-```
-OVERALL STATISTICS
-─────────────────
-Min:     19.5°C (coldest moment)
-Max:     25.8°C (hottest moment)
-Average: 22.4°C (mean)
+        function updateSystemInfo() {
+            fetch(API_BASE + '/system/status')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('infoSystemState').textContent = data.system_state;
+                    document.getElementById('infoLoggingState').textContent = data.logging_state;
+                    document.getElementById('infoSerialConnected').textContent = data.serial_connected ? 'Yes' : 'No';
+                    document.getElementById('infoLastUpdate').textContent = new Date().toLocaleString();
+                })
+                .catch(err => console.error('System info error:', err));
+        }
 
-PER-SENSOR BREAKDOWN
-────────────────────
+        function saveSettings() {
+            const interval = parseInt(document.getElementById('refreshInterval').value) * 1000;
+            if (interval > 0) {
+                refreshIntervalMs = interval;
+                localStorage.setItem('refreshInterval', interval);
+                showStatus('Settings saved', 'success');
+            }
+        }
 
-Living Room (4 readings)
-├─ Range: 22.1 - 23.8°C
-├─ Average: 22.95°C
-└─ Difference: +0.55°C ↑ Warmer
-   → This room is warm (good for living, maybe adjust if too warm)
-
-Kitchen (4 readings)
-├─ Range: 23.2 - 24.9°C
-├─ Average: 24.05°C
-└─ Difference: +1.65°C ↑ Warmer
-   → Hot spot! Check for heat sources or poor insulation
-
-Bedroom (4 readings)
-├─ Range: 20.8 - 21.5°C
-├─ Average: 21.15°C
-└─ Difference: -1.25°C ↓ Cooler
-   → Cool/cold - might need more heat or better insulation
-```
-
-**Interpretation:**
-- Kitchen is 1.65°C hotter than average (investigate why)
-- Bedroom is 1.25°C cooler than average (comfort issue?)
-- Living room is slightly warm (pleasant)
-
----
-
-## 🚀 Installation
-
-Only the **HTML file** changed:
-
-```bash
-# Replace your index.html with v6.4
-cp index_v6.4.html /path/to/templates/index.html
-
-# Restart Flask
-systemctl restart flask
-
-# Hard refresh browser (Ctrl+F5 or Cmd+Shift+R)
-```
-
-**No other changes needed:**
-- Python backend: unchanged
-- Arduino: unchanged
-- CSV logging: unchanged
-- Everything else: works the same
-
----
-
-## 📋 Testing
-
-1. Go to **Historical Graphs** tab
-2. Click **Load Data**
-3. Select a session with multiple sensors
-4. Scroll down to "Per-Sensor Statistics"
-5. You should see:
-   - Each sensor's min/max/avg/range
-   - **NEW:** "Vs Overall Avg" showing delta with color-coded indicator
-   - Example: "+0.75°C ↑ Warmer" in red
-
----
-
-## ✅ Features
-
-✅ Automatic calculation (no manual input needed)
-✅ Color-coded visualization (red/green/gray)
-✅ Arrow indicators (↑ ↓ ≈)
-✅ Threshold-based (±0.05°C prevents noise)
-✅ Works with any number of sensors
-✅ No performance impact
-✅ 100% backward compatible
-
----
-
-## 🎯 Summary
-
-**What you asked:** Show each sensor's average deviation from overall average  
-**What we did:** Added delta calculation and color-coded visualization  
-**Impact:** Easy identification of warm/cool spots in your building  
-**Installation:** Just replace index.html  
-**Result:** Better insights into temperature distribution! 📊
-
----
-
-## 📞 Questions?
-
-The delta shows **how different each sensor is from the building average**:
-- **Red ↑**: Warmer than average → Heat source or poor AC
-- **Green ↓**: Cooler than average → Less heating or good AC
-- **Gray ≈**: About average → Normal conditions
-
-Use this to identify problem areas and optimize comfort/efficiency! 🏠
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedInterval = localStorage.getItem('refreshInterval');
+            if (savedInterval) {
+                refreshIntervalMs = parseInt(savedInterval);
+                document.getElementById('refreshInterval').value = refreshIntervalMs / 1000;
+            }
+            
+            updateSystemStatus();
+            refreshSensors();
+            updateLoggingStatus();
+            
+            setInterval(refreshSensors, refreshIntervalMs);
+            setInterval(updateSystemStatus, 5000);
+            setInterval(updateLoggingStatus, 5000);
+        });
+    </script>
+</body>
+</html>

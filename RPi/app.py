@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 from flask_cors import CORS
 import serial
 import threading
@@ -108,7 +108,6 @@ class SensorDataManager:
     
     def disable_mock_mode(self):
         self.mock_mode = False
-        # Remove only mock sensors
         with self.lock:
             mock_ids = [id for id in self.sensors if id.startswith('280000')]
             for id in mock_ids:
@@ -193,6 +192,8 @@ data_logger = DataLogger()
 serial_thread = None
 serial_messages = []
 MAX_SERIAL_MESSAGES = 1000
+logging_thread = None
+logging_stop_event = threading.Event()
 
 # ============================================================================
 # SERIAL COMMUNICATION
@@ -266,13 +267,23 @@ def add_serial_message(message, msg_type='unknown'):
     if len(serial_messages) > MAX_SERIAL_MESSAGES:
         serial_messages.pop(0)
 
+def logging_worker():
+    """Background worker for data logging"""
+    global logging_stop_event
+    
+    while not logging_stop_event.is_set():
+        if data_logger.is_logging:
+            sensors = data_manager.get_sensors()
+            data_logger.log_reading(sensors)
+        time.sleep(1)
+
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
 
 @app.route('/')
 def index():
-    return render_template('index_v6.5.html')
+    return render_template('index.html')
 
 @app.route('/api/sensors')
 def get_sensors():
@@ -464,6 +475,11 @@ if __name__ == '__main__':
     # Start serial thread
     serial_thread = threading.Thread(target=read_serial, daemon=True)
     serial_thread.start()
+    
+    # Start logging worker thread
+    logging_stop_event.clear()
+    logging_thread = threading.Thread(target=logging_worker, daemon=True)
+    logging_thread.start()
     
     # Run Flask
     app.run(host='0.0.0.0', port=5000, debug=False)
