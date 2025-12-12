@@ -432,7 +432,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🌡️ Temperature Monitoring System</h1>
+            <h1>Temperature Monitoring System</h1>
             <p>Real-time sensor data monitoring and logging</p>
             <div class="status-bar">
                 <div class="status-item">
@@ -447,11 +447,11 @@
         </header>
 
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('sensors')">📊 Sensors</button>
-            <button class="tab-btn" onclick="switchTab('logging')">📝 Data Logging</button>
-            <button class="tab-btn" onclick="switchTab('graphs')">📈 Historical Graphs</button>
-            <button class="tab-btn" onclick="switchTab('settings')">⚙️ Settings</button>
-            <button class="tab-btn" onclick="switchTab('serialmonitor')">🖥️ Serial Monitor</button>
+            <button class="tab-btn active" onclick="switchTab('sensors')">Sensors</button>
+            <button class="tab-btn" onclick="switchTab('logging')">Data Logging</button>
+            <button class="tab-btn" onclick="switchTab('graphs')">Historical Graphs</button>
+            <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+            <button class="tab-btn" onclick="switchTab('serialmonitor')">Serial Monitor</button>
         </div>
 
         <!-- SENSORS TAB -->
@@ -459,9 +459,9 @@
             <div class="card">
                 <h2>Current Sensor Readings</h2>
                 <div class="button-group">
-                    <button class="btn btn-secondary" onclick="rescanSensors()">🔄 Rescan Sensors</button>
-                    <button class="btn btn-secondary" onclick="refreshSensors()">🔃 Refresh Now</button>
-                    <button class="btn btn-primary" id="mockModeToggle" onclick="toggleMockMode()">🔴 Mock Mode OFF</button>
+                    <button class="btn btn-secondary" onclick="rescanSensors()">Rescan Sensors</button>
+                    <button class="btn btn-secondary" onclick="refreshSensors()">Refresh Now</button>
+                    <button class="btn btn-primary" id="mockModeToggle" onclick="toggleMockMode()">Mock Mode OFF</button>
                 </div>
                 <div id="statusMessage" class="status-message"></div>
                 <div class="sensors-grid" id="sensorsGrid">
@@ -471,11 +471,6 @@
                         <div class="status">Waiting for data</div>
                     </div>
                 </div>
-
-                <div id="renameSection" style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0;">
-                    <h3>Rename Probes</h3>
-                    <div id="renameForm"></div>
-                </div>
             </div>
         </div>
 
@@ -484,8 +479,8 @@
             <div class="card">
                 <h2>Data Logging Control</h2>
                 <div class="button-group">
-                    <button class="btn btn-primary" id="startLoggingBtn" onclick="startLogging()">▶ Start Logging</button>
-                    <button class="btn btn-danger" id="stopLoggingBtn" onclick="stopLogging()" disabled>⏹ Stop Logging</button>
+                    <button class="btn btn-primary" id="startLoggingBtn" onclick="startLogging()">Start Logging</button>
+                    <button class="btn btn-danger" id="stopLoggingBtn" onclick="stopLogging()" disabled>Stop Logging</button>
                 </div>
 
                 <div class="logging-controls">
@@ -508,7 +503,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div id="statusMessageLogging" class="status-message"></div>
             </div>
         </div>
@@ -518,14 +512,13 @@
             <div class="card">
                 <h2>Historical Temperature Data</h2>
                 <div class="button-group">
-                    <button class="btn btn-secondary" onclick="loadGraphData()">📊 Load Data</button>
-                    <button class="btn btn-secondary" onclick="downloadGraphData()">📥 Download CSV</button>
+                    <button class="btn btn-secondary" onclick="loadGraphData()">Load Data</button>
+                    <button class="btn btn-secondary" onclick="downloadGraphData()">Download CSV</button>
                 </div>
-
                 <div id="statusMessageGraphs" class="status-message"></div>
 
                 <div id="sessionSelector" style="display: none; margin-bottom: 20px;">
-                    <label for="sessionSelect">Select Session:</label>
+                    <label for="sessionSelect">Select Session</label>
                     <select id="sessionSelect" onchange="displayGraph()" style="margin-top: 10px;">
                         <option value="">Loading...</option>
                     </select>
@@ -551,7 +544,6 @@
                             <div style="font-size: 20px; font-weight: bold; margin-top: 8px;" id="statAvg">--°C</div>
                         </div>
                     </div>
-
                     <h3 style="margin-top: 30px;">Per-Sensor Statistics</h3>
                     <div id="perSensorStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">
                         <!-- Per-sensor stats will be inserted here by JavaScript -->
@@ -568,7 +560,7 @@
                     <label>Auto-refresh Interval (seconds)</label>
                     <input type="number" id="refreshInterval" min="1" max="60" value="2">
                 </div>
-                <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+                <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
             </div>
 
             <div class="card">
@@ -580,21 +572,21 @@
                     <div>Last Update: <span id="infoLastUpdate">--</span></div>
                 </div>
             </div>
+
+            <div class="card">
+                <h2>Probe Management</h2>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Rename your temperature probes for easy identification.</p>
+                <div id="renameForm"></div>
+            </div>
         </div>
 
         <!-- SERIAL MONITOR TAB -->
         <div id="serialmonitor" class="tab-content">
             <div class="card">
                 <h2>Serial Monitor</h2>
-                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
-                    View all incoming serial data from Arduino. Shows messages, warnings, errors, and temperature readings.
-                </p>
-
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">View all incoming serial data from Arduino. Shows messages, warnings, errors, and temperature readings.</p>
                 <div class="serial-filter-wrapper">
-                    <button class="btn btn-secondary" id="pauseResumeBtn" onclick="toggleSerialMonitor()">
-                        ⏸️ Pause
-                    </button>
-
+                    <button class="btn btn-secondary" id="pauseResumeBtn" onclick="toggleSerialMonitor()">Pause</button>
                     <select id="serialFilter" onchange="updateSerialMonitor()">
                         <option value="">All Messages</option>
                         <option value="temperature">Temperature Data</option>
@@ -602,38 +594,28 @@
                         <option value="warning">Warnings Only</option>
                         <option value="error">Errors Only</option>
                     </select>
-
-                    <button class="btn btn-secondary" onclick="downloadSerialLog()">
-                        📥 Download Log
-                    </button>
-
-                    <button class="btn btn-danger" onclick="clearSerialMonitor()">
-                        🗑️ Clear
-                    </button>
+                    <button class="btn btn-secondary" onclick="downloadSerialLog()">Download Log</button>
+                    <button class="btn btn-danger" onclick="clearSerialMonitor()">Clear</button>
                 </div>
-
                 <div class="serial-monitor" id="serialMonitor">
                     <div class="monitor-line info">Waiting for serial data...</div>
                 </div>
-
                 <div class="serial-legend">
-                    <strong>Legend:</strong>
-                    <span style="color: #4ec9b0;">● Temperature Data</span>
-                    <span style="color: #569cd6;">● Info Messages</span>
-                    <span style="color: #ce9178;">● Warnings</span>
-                    <span style="color: #f48771;">● Errors</span>
+                    <strong>Legend</strong>
+                    <span style="color: #4ec9b0;">Temperature Data</span>
+                    <span style="color: #569cd6;">Info Messages</span>
+                    <span style="color: #ce9178;">Warnings</span>
+                    <span style="color: #f48771;">Errors</span>
                 </div>
             </div>
         </div>
-
     </div>
 
     <script>
-        // =====================================================================
+        // ============================================================================
         // CONFIGURATION
-        // =====================================================================
-
-        const API_BASE = '/api';
+        // ============================================================================
+        const API_BASE = '/api/';
         let refreshIntervalMs = 2000;
         let autoRefreshTimer = null;
         let graphChart = null;
@@ -641,10 +623,9 @@
         let serialMonitorInterval = null;
         let mockModeEnabled = false;
 
-        // =====================================================================
+        // ============================================================================
         // TAB SWITCHING
-        // =====================================================================
-
+        // ============================================================================
         function switchTab(tabName) {
             // Hide all tabs
             const tabs = document.querySelectorAll('.tab-content');
@@ -678,10 +659,9 @@
             }
         }
 
-        // =====================================================================
+        // ============================================================================
         // STATUS UPDATES
-        // =====================================================================
-
+        // ============================================================================
         function showStatus(message, type = 'info', elementId = 'statusMessage') {
             const el = document.getElementById(elementId);
             el.textContent = message;
@@ -692,16 +672,16 @@
         }
 
         function updateSystemStatus() {
-            fetch(`${API_BASE}/system/status`)
+            fetch(API_BASE + 'system/status')
                 .then(r => r.json())
                 .then(data => {
                     const statusEl = document.getElementById('systemStatus');
                     const statusText = document.getElementById('systemStatusText');
                     statusEl.className = data.serial_connected ? 'status-indicator' : 'status-indicator offline';
                     statusText.textContent = data.serial_connected ? 'Arduino Connected' : 'Arduino Offline';
-                    
+
                     // Update mock mode state only if it changed
-                    const newMockState = data.mock_mode || false;  // ✅ Correct field name
+                    const newMockState = data.mock_mode || false;
                     if (newMockState !== mockModeEnabled) {
                         mockModeEnabled = newMockState;
                         updateMockModeButton();
@@ -710,12 +690,11 @@
                 .catch(err => console.error('Status update error:', err));
         }
 
-        // =====================================================================
+        // ============================================================================
         // SENSORS TAB
-        // =====================================================================
-
+        // ============================================================================
         function refreshSensors() {
-            fetch(`${API_BASE}/sensors`)
+            fetch(API_BASE + 'sensors')
                 .then(r => {
                     if (!r.ok) throw new Error(`HTTP ${r.status}`);
                     return r.json();
@@ -725,7 +704,8 @@
                     let sensors = data.sensors;
 
                     // Filter out mock sensors if mock mode is disabled
-                    if (!mockModeEnabled && sensors) {
+                    if (!mockModeEnabled) {
+                        sensors = {};
                         const filteredSensors = {};
                         Object.entries(sensors).forEach(([id, sensor]) => {
                             // Keep only real sensors (those that are not marked as mock)
@@ -737,26 +717,29 @@
                     }
 
                     if (!sensors || Object.keys(sensors).length === 0) {
-                        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">No sensors detected. Try rescanning.</div>';
+                        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #999;">No sensors detected. Try rescanning.</div>`;
                         return;
                     }
 
-                    grid.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
-                        <div class="sensor-card ${sensor.status === 'offline' ? 'offline' : ''}">
+                    grid.innerHTML = Object.entries(sensors).map(([id, sensor]) =>
+                        `<div class="sensor-card ${sensor.status === 'offline' ? 'offline' : ''}">
                             <div class="name">${sensor.name}</div>
                             <div class="temperature">${sensor.status === 'online' ? sensor.temperature.toFixed(2) : '--'}°C</div>
-                            <div class="status">${sensor.status === 'online' ? '✓ Online' : '✗ Offline'}</div>
-                        </div>
-                    `).join('');
+                            <div class="status">${sensor.status === 'online' ? 'Online' : 'Offline'}</div>
+                        </div>`
+                    ).join('');
 
-                    // Build rename form
+                    // Build rename form (ONLY if it's empty to prevent losing focus during typing)
                     const renameForm = document.getElementById('renameForm');
-                    renameForm.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
-                        <div class="probe-rename-form">
-                            <input type="text" id="rename_${id}" value="${sensor.name}" placeholder="Probe name">
-                            <button class="btn btn-primary" onclick="renameSensor('${id}')">Rename</button>
-                        </div>
-                    `).join('');
+                    if (!renameForm.innerHTML || renameForm.innerHTML.trim() === '') {
+                        renameForm.innerHTML = Object.entries(sensors).map(([id, sensor]) =>
+                            `<div class="probe-rename-form">
+                                <input type="text" id="rename${id}" value="${sensor.name}" placeholder="Probe name">
+                                <button class="btn btn-primary" onclick="renameSensor('${id}')">Rename</button>
+                            </div>`
+                        ).join('');
+                    }
+
                 })
                 .catch(err => {
                     console.error('Sensor refresh error:', err);
@@ -765,7 +748,7 @@
         }
 
         function refreshSensorsWithRetry(retries = 3) {
-            fetch(`${API_BASE}/sensors`)
+            fetch(API_BASE + 'sensors')
                 .then(r => {
                     if (!r.ok) throw new Error(`HTTP ${r.status}`);
                     return r.json();
@@ -776,35 +759,37 @@
 
                     if (!sensors || Object.keys(sensors).length === 0) {
                         if (retries > 0) {
-                            console.log(`No sensors yet, retrying... (${retries} attempts left)`);
+                            console.log(`No sensors yet, retrying... ${retries} attempts left`);
                             setTimeout(() => refreshSensorsWithRetry(retries - 1), 1000);
                             return;
                         }
-                        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">No sensors detected. Try rescanning.</div>';
+                        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #999;">No sensors detected. Try rescanning.</div>`;
                         return;
                     }
 
-                    grid.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
-                        <div class="sensor-card ${sensor.status === 'offline' ? 'offline' : ''}">
+                    grid.innerHTML = Object.entries(sensors).map(([id, sensor]) =>
+                        `<div class="sensor-card ${sensor.status === 'offline' ? 'offline' : ''}">
                             <div class="name">${sensor.name}</div>
                             <div class="temperature">${sensor.status === 'online' ? sensor.temperature.toFixed(2) : '--'}°C</div>
-                            <div class="status">${sensor.status === 'online' ? '✓ Online' : '✗ Offline'}</div>
-                        </div>
-                    `).join('');
+                            <div class="status">${sensor.status === 'online' ? 'Online' : 'Offline'}</div>
+                        </div>`
+                    ).join('');
 
                     // Build rename form
                     const renameForm = document.getElementById('renameForm');
-                    renameForm.innerHTML = Object.entries(sensors).map(([id, sensor]) => `
-                        <div class="probe-rename-form">
-                            <input type="text" id="rename_${id}" value="${sensor.name}" placeholder="Probe name">
-                            <button class="btn btn-primary" onclick="renameSensor('${id}')">Rename</button>
-                        </div>
-                    `).join('');
+                    if (!renameForm.innerHTML || renameForm.innerHTML.trim() === '') {
+                        renameForm.innerHTML = Object.entries(sensors).map(([id, sensor]) =>
+                            `<div class="probe-rename-form">
+                                <input type="text" id="rename${id}" value="${sensor.name}" placeholder="Probe name">
+                                <button class="btn btn-primary" onclick="renameSensor('${id}')">Rename</button>
+                            </div>`
+                        ).join('');
+                    }
                 })
                 .catch(err => {
                     console.error('Sensor refresh error:', err);
                     if (retries > 0) {
-                        console.log(`Error fetching sensors, retrying... (${retries} attempts left)`);
+                        console.log(`Error fetching sensors, retrying... ${retries} attempts left`);
                         setTimeout(() => refreshSensorsWithRetry(retries - 1), 1500);
                     } else {
                         showStatus('Error loading sensors', 'error');
@@ -813,10 +798,10 @@
         }
 
         function rescanSensors() {
-            fetch(`${API_BASE}/probes/rescan`, { method: 'POST' })
+            fetch(API_BASE + 'probes/rescan', { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
-                    showStatus('✓ Rescan initiated', 'success');
+                    showStatus('Rescan initiated', 'success');
                     setTimeout(refreshSensors, 1000);
                 })
                 .catch(err => {
@@ -826,20 +811,19 @@
         }
 
         function renameSensor(sensorId) {
-            const newName = document.getElementById(`rename_${sensorId}`).value;
+            const newName = document.getElementById(`rename${sensorId}`).value;
             if (!newName.trim()) {
                 showStatus('Please enter a name', 'error');
                 return;
             }
-
-            fetch(`${API_BASE}/probes/rename`, {
+            fetch(API_BASE + 'probes/rename', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sensor_id: sensorId, name: newName })
             })
                 .then(r => r.json())
                 .then(data => {
-                    showStatus('✓ Probe renamed successfully', 'success');
+                    showStatus('Probe renamed successfully', 'success');
                     refreshSensors();
                 })
                 .catch(err => {
@@ -851,79 +835,74 @@
         function toggleMockMode() {
             const btn = document.getElementById('mockModeToggle');
             btn.disabled = true;
-            
+
             if (mockModeEnabled) {
                 // Disable mock mode
                 console.log('Disabling mock mode...');
-                showStatus('⏳ Disabling mock mode...', 'info');
-                fetch(`${API_BASE}/mock/disable`, { method: 'POST' })
+                showStatus('Disabling mock mode...', 'info');
+                fetch(API_BASE + 'mock/disable', { method: 'POST' })
                     .then(r => r.json())
                     .then(data => {
                         console.log('Mock disabled:', data);
                         mockModeEnabled = false;
                         updateMockModeButton();
-                        showStatus('✓ Mock mode disabled - fake sensors removed', 'success');
+                        showStatus('Mock mode disabled - fake sensors removed', 'success');
                         setTimeout(refreshSensors, 500);
                     })
                     .catch(err => {
                         console.error('Mock disable error:', err);
                         showStatus('Error disabling mock mode', 'error');
-                        btn.disabled = false;
                     });
             } else {
                 // Enable mock mode
                 console.log('Enabling mock mode...');
-                showStatus('⏳ Enabling mock mode...', 'info');
-                fetch(`${API_BASE}/mock/enable`, { method: 'POST' })
+                showStatus('Enabling mock mode...', 'info');
+                fetch(API_BASE + 'mock/enable', { method: 'POST' })
                     .then(r => r.json())
                     .then(data => {
                         console.log('Mock enabled:', data);
                         mockModeEnabled = true;
                         updateMockModeButton();
-                        showStatus('✓ Mock mode enabled', 'success');
+                        showStatus('Mock mode enabled', 'success');
                         setTimeout(() => refreshSensorsWithRetry(3), 1000);
                     })
                     .catch(err => {
                         console.error('Mock enable error:', err);
                         showStatus('Error enabling mock mode', 'error');
-                        btn.disabled = false;
                     });
             }
+            btn.disabled = false;
         }
 
         function updateMockModeButton() {
             const btn = document.getElementById('mockModeToggle');
             if (mockModeEnabled) {
-                btn.textContent = '🟢 Mock Mode ON';
+                btn.textContent = 'Mock Mode ON';
                 btn.classList.add('active');
             } else {
-                btn.textContent = '🔴 Mock Mode OFF';
+                btn.textContent = 'Mock Mode OFF';
                 btn.classList.remove('active');
             }
             btn.disabled = false;
         }
 
-        // =====================================================================
+        // ============================================================================
         // LOGGING TAB
-        // =====================================================================
-
+        // ============================================================================
         function startLogging() {
             const duration = document.getElementById('logDuration').value;
             const interval = document.getElementById('logInterval').value;
             const durationSec = duration ? parseInt(duration) * 60 : null;
             const intervalSec = interval ? parseInt(interval) : 60;
 
-            fetch(`${API_BASE}/logging/start`, {
+            fetch(API_BASE + 'logging/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    duration: durationSec,
-                    interval: intervalSec
-                })
+                body: JSON.stringify({ duration: durationSec, interval: intervalSec })
             })
                 .then(r => r.json())
                 .then(data => {
-                    showStatus(`✓ Logging started: ${data.filename}`, 'success', 'statusMessageLogging');
+                    showStatus(`Logging started: ${data.filename}`, 'success', 'statusMessageLogging');
                     document.getElementById('startLoggingBtn').disabled = true;
                     document.getElementById('stopLoggingBtn').disabled = false;
                     document.getElementById('loggingStatus').value = 'Logging...';
@@ -936,10 +915,10 @@
         }
 
         function stopLogging() {
-            fetch(`${API_BASE}/logging/stop`, { method: 'POST' })
+            fetch(API_BASE + 'logging/stop', { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
-                    showStatus(`✓ Logging stopped: ${data.filename}`, 'success', 'statusMessageLogging');
+                    showStatus(`Logging stopped: ${data.filename}`, 'success', 'statusMessageLogging');
                     document.getElementById('startLoggingBtn').disabled = false;
                     document.getElementById('stopLoggingBtn').disabled = true;
                     document.getElementById('loggingStatus').value = 'Stopped';
@@ -951,7 +930,7 @@
         }
 
         function updateLoggingStatus() {
-            fetch(`${API_BASE}/system/status`)
+            fetch(API_BASE + 'system/status')
                 .then(r => r.json())
                 .then(data => {
                     const isLogging = data.logging_state === 'logging';
@@ -962,16 +941,15 @@
                 .catch(err => console.error('Logging status error:', err));
         }
 
-        // =====================================================================
+        // ============================================================================
         // GRAPHS TAB
-        // =====================================================================
-
+        // ============================================================================
         function loadGraphData() {
-            fetch(`${API_BASE}/graphs/data`)
+            fetch(API_BASE + 'graphs/data')
                 .then(r => r.json())
                 .then(data => {
-                    const sessions = data.sessions || {};
-                    const files = data.files || [];
+                    const sessions = data.sessions;
+                    const files = data.files;
 
                     if (files.length === 0) {
                         showStatus('No logged data available', 'info', 'statusMessageGraphs');
@@ -980,12 +958,10 @@
 
                     const selector = document.getElementById('sessionSelector');
                     const select = document.getElementById('sessionSelect');
-
                     select.innerHTML = files.map(f => `<option value="${f}">${f}</option>`).join('');
                     selector.style.display = 'block';
-
                     displayGraph();
-                    showStatus('✓ Data loaded', 'success', 'statusMessageGraphs');
+                    showStatus('Data loaded', 'success', 'statusMessageGraphs');
                 })
                 .catch(err => {
                     console.error('Graph data error:', err);
@@ -997,11 +973,11 @@
             const sessionFile = document.getElementById('sessionSelect').value;
             if (!sessionFile) return;
 
-            fetch(`${API_BASE}/graphs/data?file=${sessionFile}`)
+            fetch(`${API_BASE}graphs/data?file=${sessionFile}`)
                 .then(r => r.json())
                 .then(data => {
-                    const sessions = data.sessions || {};
-                    const sessionData = sessions[sessionFile] || [];
+                    const sessions = data.sessions;
+                    const sessionData = sessions[sessionFile];
 
                     if (sessionData.length === 0) {
                         showStatus('No data in session', 'info', 'statusMessageGraphs');
@@ -1019,23 +995,21 @@
                         return time.toLocaleTimeString();
                     });
 
-                    const colors = ['#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff'];
+                    const colors = ['ff6384', '36a2eb', 'ffce56', '4bc0c0', '9966ff'];
                     const datasets = [];
 
                     Array.from(sensorIds).forEach((sensorId, idx) => {
                         datasets.push({
                             label: sensorId.substring(0, 8),
                             data: sessionData.map(item => item.readings[sensorId] || null),
-                            borderColor: colors[idx % colors.length],
+                            borderColor: `#${colors[idx % colors.length]}`,
                             tension: 0.1,
                             fill: false
                         });
                     });
 
                     // Destroy existing chart
-                    if (graphChart) {
-                        graphChart.destroy();
-                    }
+                    if (graphChart) graphChart.destroy();
 
                     const ctx = document.getElementById('temperatureChart').getContext('2d');
                     graphChart = new Chart(ctx, {
@@ -1048,18 +1022,12 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'bottom'
-                                }
+                                legend: { display: true, position: 'bottom' }
                             },
                             scales: {
                                 y: {
                                     beginAtZero: false,
-                                    title: {
-                                        display: true,
-                                        text: 'Temperature (°C)'
-                                    }
+                                    title: { display: true, text: 'Temperature (°C)' }
                                 }
                             }
                         }
@@ -1069,79 +1037,72 @@
                     const allTemps = [];
                     const sensorStats = {};
 
-                    // Collect all temperatures and organize by sensor
                     sessionData.forEach(item => {
                         Object.entries(item.readings).forEach(([sensorId, temp]) => {
                             if (temp !== null) {
                                 allTemps.push(temp);
                                 if (!sensorStats[sensorId]) {
-                                    sensorStats[sensorId] = {
-                                        temps: [],
-                                        name: sensorId.substring(0, 8).toUpperCase()
-                                    };
+                                    sensorStats[sensorId] = { temps: [], name: sensorId.substring(0, 8).toUpperCase() };
                                 }
                                 sensorStats[sensorId].temps.push(temp);
                             }
                         });
                     });
 
-                    if (allTemps.length > 0) {
-                        // Overall stats
-                        const min = Math.min(...allTemps);
-                        const max = Math.max(...allTemps);
-                        const avg = (allTemps.reduce((a, b) => a + b) / allTemps.length).toFixed(2);
+                    if (allTemps.length === 0) return;
 
-                        document.getElementById('statMin').textContent = min.toFixed(2) + '°C';
-                        document.getElementById('statMax').textContent = max.toFixed(2) + '°C';
-                        document.getElementById('statAvg').textContent = avg + '°C';
+                    const min = Math.min(...allTemps);
+                    const max = Math.max(...allTemps);
+                    const avg = (allTemps.reduce((a, b) => a + b) / allTemps.length).toFixed(2);
 
-                        // Per-sensor stats
-                        const overallAvg = parseFloat(avg);
-                        const perSensorHtml = Object.entries(sensorStats).map(([sensorId, stats]) => {
-                            const temps = stats.temps;
-                            const sensorMin = Math.min(...temps);
-                            const sensorMax = Math.max(...temps);
-                            const sensorAvg = (temps.reduce((a, b) => a + b) / temps.length).toFixed(2);
-                            const readings = temps.length;
-                            const diffFromAvg = (sensorAvg - overallAvg).toFixed(2);
-                            const diffColor = diffFromAvg > 0 ? '#f44336' : diffFromAvg < 0 ? '#4CAF50' : '#999';
-                            const diffSign = diffFromAvg > 0 ? '+' : '';
+                    document.getElementById('statMin').textContent = min.toFixed(2) + '°C';
+                    document.getElementById('statMax').textContent = max.toFixed(2) + '°C';
+                    document.getElementById('statAvg').textContent = avg + '°C';
 
-                            return `
-                                <div style="background: white; border: 1px solid #e0e0e0; border-radius: 4px; padding: 15px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                        <h4 style="margin: 0; color: #667eea;">${stats.name}</h4>
-                                        <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; font-size: 11px; color: #666;">${readings} readings</span>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                        <div>
-                                            <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Minimum</div>
-                                            <div style="font-size: 16px; font-weight: bold; color: #667eea;">${sensorMin.toFixed(2)}°C</div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Maximum</div>
-                                            <div style="font-size: 16px; font-weight: bold; color: #764ba2;">${sensorMax.toFixed(2)}°C</div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Average</div>
-                                            <div style="font-size: 16px; font-weight: bold; color: #667eea;">${sensorAvg}°C</div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Range</div>
-                                            <div style="font-size: 16px; font-weight: bold; color: #764ba2;">${(sensorMax - sensorMin).toFixed(2)}°C</div>
-                                        </div>
-                                        <div>
-                                            <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Vs Overall Avg</div>
-                                            <div style="font-size: 16px; font-weight: bold; color: ${diffColor};">${diffSign}${diffFromAvg}°C</div>
-                                        </div>
-                                    </div>
+                    // Per-sensor stats
+                    const overallAvg = parseFloat(avg);
+                    const perSensorHtml = Object.entries(sensorStats).map(([sensorId, stats]) => {
+                        const temps = stats.temps;
+                        const sensorMin = Math.min(...temps);
+                        const sensorMax = Math.max(...temps);
+                        const sensorAvg = (temps.reduce((a, b) => a + b) / temps.length).toFixed(2);
+                        const readings = temps.length;
+                        const diffFromAvg = (sensorAvg - overallAvg).toFixed(2);
+                        const diffColor = diffFromAvg > 0 ? 'f44336' : diffFromAvg < 0 ? '4CAF50' : '999';
+                        const diffSign = diffFromAvg > 0 ? '+' : '';
+
+                        return `<div style="background: white; border: 1px solid #e0e0e0; border-radius: 4px; padding: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h4 style="margin: 0; color: #667eea;">${stats.name}</h4>
+                                <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 3px; font-size: 11px; color: #666;">${readings} readings</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Minimum</div>
+                                    <div style="font-size: 16px; font-weight: bold; color: #667eea;">${sensorMin.toFixed(2)}°C</div>
                                 </div>
-                            `;
-                        }).join('');
+                                <div>
+                                    <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Maximum</div>
+                                    <div style="font-size: 16px; font-weight: bold; color: #764ba2;">${sensorMax.toFixed(2)}°C</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Average</div>
+                                    <div style="font-size: 16px; font-weight: bold; color: #667eea;">${sensorAvg}°C</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Range</div>
+                                    <div style="font-size: 16px; font-weight: bold; color: #764ba2;">${(sensorMax - sensorMin).toFixed(2)}°C</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 11px; color: #999; margin-bottom: 4px;">Vs Overall Avg</div>
+                                    <div style="font-size: 16px; font-weight: bold; color: #${diffColor};">${diffSign}${diffFromAvg}°C</div>
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('');
 
-                        document.getElementById('perSensorStats').innerHTML = perSensorHtml;
-                        document.getElementById('graphStats').style.display = 'block';
-                    }
+                    document.getElementById('perSensorStats').innerHTML = perSensorHtml;
+                    document.getElementById('graphStats').style.display = 'block';
                 })
                 .catch(err => {
                     console.error('Display graph error:', err);
@@ -1150,39 +1111,34 @@
         }
 
         function downloadGraphData() {
-            window.location.href = `${API_BASE}/graphs/download`;
+            window.location.href = API_BASE + 'graphs/download';
         }
 
-        // =====================================================================
+        // ============================================================================
         // SERIAL MONITOR
-        // =====================================================================
-
+        // ============================================================================
         function startSerialMonitor() {
             if (serialMonitorInterval) clearInterval(serialMonitorInterval);
-
             serialMonitorInterval = setInterval(() => {
                 if (!serialMonitorPaused) {
                     updateSerialMonitor();
                 }
             }, 500);
-
             updateSerialMonitor();
         }
 
         function updateSerialMonitor() {
-            const filter = document.getElementById('serialFilter')?.value || '';
-            const url = filter
-                ? `${API_BASE}/serial/messages?type=${filter}`
-                : `${API_BASE}/serial/messages`;
+            const filter = document.getElementById('serialFilter')?.value;
+            const url = filter ? `${API_BASE}serial/messages?type=${filter}` : `${API_BASE}serial/messages`;
 
             fetch(url)
                 .then(r => r.json())
                 .then(data => {
                     const monitor = document.getElementById('serialMonitor');
-                    const messages = data.messages || [];
+                    const messages = data.messages;
 
                     if (messages.length === 0) {
-                        monitor.innerHTML = '<div class="monitor-line info">Waiting for serial data...</div>';
+                        monitor.innerHTML = `<div class="monitor-line info">Waiting for serial data...</div>`;
                         return;
                     }
 
@@ -1192,13 +1148,11 @@
                         const typeClass = msg.type || 'unknown';
                         const typeStr = (msg.type || 'unknown').toUpperCase();
 
-                        return `
-                            <div class="monitor-line ${typeClass}">
-                                <span class="monitor-timestamp">[${timeStr}]</span>
-                                <span class="monitor-type">${typeStr}</span>
-                                ${escapeHtml(msg.message)}
-                            </div>
-                        `;
+                        return `<div class="monitor-line ${typeClass}">
+                            <span class="monitor-timestamp">${timeStr}</span>
+                            <span class="monitor-type">${typeStr}</span>
+                            ${escapeHtml(msg.message)}
+                        </div>`;
                     }).join('');
 
                     monitor.scrollTop = monitor.scrollHeight;
@@ -1213,17 +1167,15 @@
         function toggleSerialMonitor() {
             serialMonitorPaused = !serialMonitorPaused;
             const btn = document.getElementById('pauseResumeBtn');
-            btn.textContent = serialMonitorPaused ? '▶️ Resume' : '⏸️ Pause';
+            btn.textContent = serialMonitorPaused ? 'Resume' : 'Pause';
             btn.style.background = serialMonitorPaused ? '#f44336' : '#e0e0e0';
             btn.style.color = serialMonitorPaused ? 'white' : '#333';
         }
 
         function clearSerialMonitor() {
-            if (!confirm('Clear all serial messages? This cannot be undone.')) {
-                return;
-            }
+            if (!confirm('Clear all serial messages? This cannot be undone.')) return;
 
-            fetch(`${API_BASE}/serial/messages`, { method: 'DELETE' })
+            fetch(API_BASE + 'serial/messages', { method: 'DELETE' })
                 .then(r => r.json())
                 .then(data => {
                     if (data.status === 'ok') {
@@ -1231,17 +1183,14 @@
                         showStatus('Serial monitor cleared', 'success');
                     }
                 })
-                .catch(err => {
-                    showStatus('Error clearing serial monitor: ' + err.message, 'error');
-                });
+                .catch(() => showStatus('Error clearing serial monitor', 'error'));
         }
 
         function downloadSerialLog() {
-            fetch(`${API_BASE}/serial/messages`)
+            fetch(API_BASE + 'serial/messages')
                 .then(r => r.json())
                 .then(data => {
-                    const messages = data.messages || [];
-
+                    const messages = data.messages;
                     if (messages.length === 0) {
                         showStatus('No messages to download', 'info');
                         return;
@@ -1250,14 +1199,14 @@
                     const lines = messages.map(msg => {
                         const time = new Date(msg.timestamp * 1000).toISOString();
                         const type = (msg.type || 'unknown').toUpperCase();
-                        return `[${time}] [${type}] ${msg.message}`;
+                        return `${time} ${type} ${msg.message}`;
                     }).join('\n');
 
-                    const blob = new Blob([lines + '\n'], { type: 'text/plain' });
+                    const blob = new Blob([lines], { type: 'text/plain' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `serial_log_${Date.now()}.txt`;
+                    a.download = `seriallog-${Date.now()}.txt`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
@@ -1265,9 +1214,7 @@
 
                     showStatus(`Downloaded ${messages.length} messages`, 'success');
                 })
-                .catch(err => {
-                    showStatus('Error downloading log: ' + err.message, 'error');
-                });
+                .catch(() => showStatus('Error downloading log', 'error'));
         }
 
         function escapeHtml(text) {
@@ -1276,18 +1223,43 @@
             return div.innerHTML;
         }
 
-        // =====================================================================
+        // ============================================================================
         // SETTINGS TAB
-        // =====================================================================
-
+        // ============================================================================
         function updateSystemInfo() {
-            fetch(`${API_BASE}/system/status`)
+            fetch(API_BASE + 'system/status')
                 .then(r => r.json())
                 .then(data => {
                     document.getElementById('infoSystemState').textContent = data.system_state;
                     document.getElementById('infoLoggingState').textContent = data.logging_state;
                     document.getElementById('infoSerialConnected').textContent = data.serial_connected ? 'Yes' : 'No';
                     document.getElementById('infoLastUpdate').textContent = new Date().toLocaleString();
+
+                    // Refresh rename form when on Settings tab to keep probe list up-to-date
+                    const renameForm = document.getElementById('renameForm');
+                    if (renameForm && renameForm.innerHTML.trim() === '') {
+                        // Only refresh if empty (user not actively renaming)
+                        fetch(API_BASE + 'sensors')
+                            .then(r => r.json())
+                            .then(data => {
+                                let sensors = data.sensors;
+                                if (!mockModeEnabled) {
+                                    const filtered = {};
+                                    Object.entries(sensors).forEach(([id, sensor]) => {
+                                        if (!id.includes('mock') && !sensor.name.toLowerCase().includes('mock')) {
+                                            filtered[id] = sensor;
+                                        }
+                                    });
+                                    sensors = filtered;
+                                }
+                                renameForm.innerHTML = Object.entries(sensors).map(([id, sensor]) =>
+                                    `<div class="probe-rename-form">
+                                        <input type="text" id="rename${id}" value="${sensor.name}" placeholder="Probe name">
+                                        <button class="btn btn-primary" onclick="renameSensor('${id}')">Rename</button>
+                                    </div>`
+                                ).join('');
+                            });
+                    }
                 })
                 .catch(err => console.error('System info error:', err));
         }
@@ -1297,14 +1269,13 @@
             if (interval > 0) {
                 refreshIntervalMs = interval;
                 localStorage.setItem('refreshInterval', interval);
-                showStatus('✓ Settings saved', 'success');
+                showStatus('Settings saved', 'success');
             }
         }
 
-        // =====================================================================
+        // ============================================================================
         // INITIALIZATION
-        // =====================================================================
-
+        // ============================================================================
         document.addEventListener('DOMContentLoaded', () => {
             // Load saved settings
             const savedInterval = localStorage.getItem('refreshInterval');
@@ -1323,10 +1294,8 @@
             setInterval(updateSystemStatus, 5000);
             setInterval(updateLoggingStatus, 5000);
 
-            // Auto-scroll (disabled for sensors tab)
-            document.getElementById('sensorsGrid').addEventListener('scroll', (e) => {
-                e.preventDefault();
-            });
+            // Auto-scroll disabled for sensors tab
+            document.getElementById('sensorsGrid').addEventListener('scroll', e => e.preventDefault());
         });
     </script>
 </body>

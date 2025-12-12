@@ -1,6 +1,9 @@
-# Temperature Monitoring System - Flask Backend (v6.1 - MOCK MODE FIX)
+# Temperature Monitoring System - Flask Backend (v6.1 - FIXED)
 # Complete implementation with SerialMessageQueue and improved data handling
-# FIXED: Added mock_mode to system_status response
+# FIXES: 
+# 1. Added mock_mode to system_status response
+# 2. Better mock sensor naming with counters
+# 3. Improved sensor data management
 
 import os
 import json
@@ -210,16 +213,25 @@ class SensorDataManager:
         self.sensors = {}
         self.history = {}
         self.lock = threading.Lock()
+        self.mock_sensor_counter = {}  # Track mock sensor names
 
     def update_sensor(self, sensor_id, temperature, status="online"):
         """Update sensor reading"""
         with self.lock:
             if sensor_id not in self.sensors:
+                # Generate better name for mock sensors
+                if sensor_id.startswith('28000'):
+                    # This is a mock sensor
+                    mock_index = len([s for s in self.sensors if s.startswith('28000')])
+                    name = f"Mock Probe {mock_index + 1}"
+                else:
+                    name = f"Probe {sensor_id[:8]}"
+                
                 self.sensors[sensor_id] = {
                     "temperature": temperature,
                     "status": status,
                     "lastUpdate": time.time(),
-                    "name": f"Probe {sensor_id[:8]}"
+                    "name": name
                 }
             else:
                 self.sensors[sensor_id]["temperature"] = temperature
@@ -739,14 +751,14 @@ def clear_serial_messages():
 
 @app.route('/api/system/status', methods=['GET'])
 def system_status():
-    """Get system status - FIXED: Now includes mock_mode field"""
+    """Get system status - INCLUDES mock_mode field"""
     state, logging_state, error = state_machine.get_state()
     return jsonify({
         "system_state": state.value,
         "logging_state": logging_state.value,
         "error": error,
         "serial_connected": serial_handler.is_connected,
-        "mock_mode": serial_handler.use_mock  # ✅ FIX: Added mock_mode field
+        "mock_mode": serial_handler.use_mock
     })
 
 # ============================================================================
