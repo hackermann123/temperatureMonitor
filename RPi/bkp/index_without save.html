@@ -381,7 +381,9 @@
             }
         }
     </style>
-</head>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script></head>
 <body>
     <header>
         <div class="container">
@@ -429,7 +431,6 @@
                 <div class="button-group">
                     <button class="btn btn-primary" id="rescanButton" onclick="rescanProbes()">🔄 Rescan Probes</button>
                     <button class="btn btn-outline" id="mockToggleButton" onclick="toggleMockMode()">🧪 Toggle Mock Mode</button>
-                    <button class="btn btn-outline" onclick="downloadProbeNamesCsv()" title="Download probe names as CSV">📥 Download Names CSV</button>
                 </div>
             </div>
         </div>
@@ -471,7 +472,7 @@
         <div id="graphs" class="tab-content">
             <div class="card">
                 <h2>📈 Temperature Graphs</h2>
-                
+
                 <div class="form-group">
                     <label for="sessionSelect">Select Log Session:</label>
                     <select id="sessionSelect" onchange="loadGraphData()">
@@ -483,6 +484,46 @@
                     <canvas id="temperatureChart"></canvas>
                 </div>
 
+                <!-- Statistics Section -->
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--color-border);">
+                    <h3 style="margin-bottom: 15px; color: var(--color-primary);">📊 Recording Statistics</h3>
+
+                    <!-- Overall Statistics -->
+                    <div style="margin-bottom: 25px;">
+                        <h4 style="font-size: 14px; font-weight: 600; color: #555; margin-bottom: 10px;">Overall Statistics</h4>
+                        <div id="overallStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                            <div style="background: var(--color-bg); padding: 12px; border-radius: 6px; border-left: 4px solid var(--color-primary);">
+                                <div style="font-size: 12px; color: var(--color-text-light);">Total Data Points</div>
+                                <div style="font-size: 18px; font-weight: 600; color: var(--color-primary);" id="stat-total">0</div>
+                            </div>
+                            <div style="background: var(--color-bg); padding: 12px; border-radius: 6px; border-left: 4px solid var(--color-success);">
+                                <div style="font-size: 12px; color: var(--color-text-light);">Global Average</div>
+                                <div style="font-size: 18px; font-weight: 600; color: var(--color-success);" id="stat-global-avg">0.0°C</div>
+                            </div>
+                            <div style="background: var(--color-bg); padding: 12px; border-radius: 6px; border-left: 4px solid var(--color-warning);">
+                                <div style="font-size: 12px; color: var(--color-text-light);">Global Max</div>
+                                <div style="font-size: 18px; font-weight: 600; color: var(--color-warning);" id="stat-global-max">0.0°C</div>
+                            </div>
+                            <div style="background: var(--color-bg); padding: 12px; border-radius: 6px; border-left: 4px solid var(--color-error);">
+                                <div style="font-size: 12px; color: var(--color-text-light);">Global Min</div>
+                                <div style="font-size: 18px; font-weight: 600; color: var(--color-error);" id="stat-global-min">0.0°C</div>
+                            </div>
+                            <div style="background: var(--color-bg); padding: 12px; border-radius: 6px; border-left: 4px solid #9b59b6;">
+                                <div style="font-size: 12px; color: var(--color-text-light);">Standard Deviation</div>
+                                <div style="font-size: 18px; font-weight: 600; color: #9b59b6;" id="stat-global-stddev">0.0°C</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Per-Sensor Statistics -->
+                    <div>
+                        <h4 style="font-size: 14px; font-weight: 600; color: #555; margin-bottom: 10px;">Per-Sensor Statistics</h4>
+                        <div id="perSensorStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">
+                            <div style="text-align: center; color: var(--color-text-light);">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="button-group">
                     <button class="btn btn-primary" onclick="downloadGraphData()">⬇️ Download CSV</button>
                     <button class="btn btn-outline" onclick="refreshSessions()">🔄 Refresh Sessions</button>
@@ -490,7 +531,6 @@
             </div>
         </div>
 
-        <!-- TAB 4: SERIAL MONITOR -->
         <div id="serial" class="tab-content">
             <div class="card">
                 <h2>🖥️ Serial Monitor</h2>
@@ -507,62 +547,7 @@
     </div>
 
     <script>
-        
-        // ===== PROBE NAME PERSISTENCE (localStorage) =====
-        const PROBE_STORAGE_KEY = 'temperature_probe_names';
-
-        function loadProbeNames() {
-            """Load saved probe names from browser storage"""
-            try {
-                const stored = localStorage.getItem(PROBE_STORAGE_KEY);
-                return stored ? JSON.parse(stored) : {};
-            } catch (error) {
-                console.error('[STORAGE] Error loading probe names:', error);
-                return {};
-            }
-        }
-
-        function saveProbeNames(probeNames) {
-            """Save probe names to browser storage"""
-            try {
-                localStorage.setItem(PROBE_STORAGE_KEY, JSON.stringify(probeNames));
-                console.log('[STORAGE] Probe names saved:', probeNames);
-            } catch (error) {
-                console.error('[STORAGE] Error saving probe names:', error);
-            }
-        }
-
-        function getSavedProbeName(sensorId) {
-            """Get saved name for a sensor, or return default"""
-            const names = loadProbeNames();
-            return names[sensorId] || null;
-        }
-
-        function getProbeNamesSummary() {
-            """Get all saved probe names as CSV format"""
-            const names = loadProbeNames();
-            let csv = 'Sensor ID,Name\n';
-            for (const [sensorId, name] of Object.entries(names)) {
-                csv += `${sensorId},"${name}"\n`;
-            }
-            return csv;
-        }
-
-        function downloadProbeNamesCsv() {
-            """Download probe names as CSV file"""
-            const csv = getProbeNamesSummary();
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `probe_names_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-            console.log('[STORAGE] Downloaded probe names CSV');
-        }
-
         // ===== GLOBAL STATE =====
-
         let currentLoggingSession = null;
         let updateInterval = null;
 
@@ -595,16 +580,7 @@
             try {
                 const response = await fetch('/api/sensors');
                 const data = await response.json();
-                let sensors = data.sensors;
-
-                // ===== APPLY SAVED NAMES =====
-                const savedNames = loadProbeNames();
-                for (const sensorId in sensors) {
-                    if (savedNames[sensorId]) {
-                        sensors[sensorId].name = savedNames[sensorId];
-                        console.log(`[STORAGE] Applied saved name for ${sensorId}: ${savedNames[sensorId]}`);
-                    }
-                }
+                const sensors = data.sensors;
 
                 // Update sensor grid
                 const grid = document.getElementById('sensorGrid');
@@ -644,6 +620,7 @@
                 console.error('[ERROR] Update sensor list failed:', error);
             }
         }
+
         // ===== UPDATE PROBE MANAGEMENT =====
         function updateProbeManagement(sensors) {
             const container = document.getElementById('probeManagement');
@@ -698,12 +675,7 @@
                     return;
                 }
 
-                // ===== SAVE TO LOCALSTORAGE =====
-                const probeNames = loadProbeNames();
-                probeNames[sensorId] = newName;
-                saveProbeNames(probeNames);
-
-                console.log('[RENAME] Probe renamed successfully and saved');
+                console.log('[RENAME] Probe renamed successfully');
                 await updateSensorList();
 
             } catch (error) {
@@ -711,6 +683,7 @@
                 alert(`Failed to rename probe: ${error.message}`);
             }
         }
+
         // Fix typo in HTML
         function renameProbel(sensorId, newName) {
             renameProbe(sensorId, newName);
@@ -891,19 +864,213 @@
                 const data = await response.json();
                 const sessionData = data.sessions[filename];
 
-                if (!sessionData) {
+                if (!sessionData || sessionData.length === 0) {
                     alert('No data available for this session');
                     return;
                 }
 
-                // Simple chart rendering (text-based for demo)
-                console.log('[GRAPH] Data loaded:', sessionData.length, 'readings');
+                // ===== DATA PREPARATION =====
+                const timestamps = [];
+                const sensorDataMap = {};
+                let allTemperatures = [];
+
+                sessionData.forEach(entry => {
+                    const date = new Date(entry.timestamp);
+                    const timeStr = date.toLocaleTimeString();
+                    timestamps.push(timeStr);
+
+                    for (const [sensorName, temp] of Object.entries(entry.readings)) {
+                        if (!sensorDataMap[sensorName]) {
+                            sensorDataMap[sensorName] = [];
+                        }
+                        sensorDataMap[sensorName].push(temp);
+                        if (temp !== null) {
+                            allTemperatures.push(temp);
+                        }
+                    }
+                });
+
+                // ===== CALCULATE OVERALL STATISTICS =====
+                const overallStats = calculateStats(allTemperatures);
+
+                // ===== CALCULATE PER-SENSOR STATISTICS =====
+                const perSensorStats = {};
+                Object.entries(sensorDataMap).forEach(([sensorName, temps]) => {
+                    const validTemps = temps.filter(t => t !== null);
+                    perSensorStats[sensorName] = {
+                        stats: calculateStats(validTemps),
+                        deviationFromGlobal: validTemps.map(t => t - overallStats.avg)
+                    };
+                });
+
+                // ===== RENDER CHART =====
+                const colors = [
+                    'rgb(33, 128, 181)',
+                    'rgb(230, 126, 34)',
+                    'rgb(46, 204, 113)',
+                    'rgb(231, 76, 60)',
+                    'rgb(155, 89, 182)',
+                    'rgb(52, 152, 219)',
+                    'rgb(241, 196, 15)'
+                ];
+
+                const datasets = Object.entries(sensorDataMap).map((entry, index) => ({
+                    label: entry[0],
+                    data: entry[1],
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '22',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 4,
+                    pointBackgroundColor: colors[index % colors.length],
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1
+                }));
+
+                const ctx = document.getElementById('temperatureChart').getContext('2d');
+
+                if (window.temperatureChartInstance) {
+                    window.temperatureChartInstance.destroy();
+                }
+
+                window.temperatureChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: timestamps,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    boxWidth: 12,
+                                    font: { size: 12 },
+                                    padding: 15,
+                                    color: '#333'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: `Temperature Data - ${filename.replace('temperature_log_', '').replace('.csv', '')}`,
+                                font: { size: 14, weight: 'bold' },
+                                color: '#333',
+                                padding: 20
+                            }
+                        },
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Temperature (°C)',
+                                    color: '#666'
+                                },
+                                grid: {
+                                    color: '#eee'
+                                },
+                                ticks: {
+                                    color: '#666'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time',
+                                    color: '#666'
+                                },
+                                grid: {
+                                    color: '#eee'
+                                },
+                                ticks: {
+                                    color: '#666',
+                                    maxRotation: 45,
+                                    minRotation: 0
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // ===== DISPLAY STATISTICS =====
+                displayOverallStats(overallStats, allTemperatures.length);
+                displayPerSensorStats(perSensorStats, overallStats.avg, colors);
+
+                console.log('[GRAPH] Chart rendered successfully');
 
             } catch (error) {
                 console.error('[ERROR] Load graph data failed:', error);
+                alert('Error loading graph data: ' + error.message);
             }
         }
 
+        // ===== HELPER FUNCTIONS =====
+        function calculateStats(values) {
+            if (values.length === 0) return { avg: 0, max: 0, min: 0, stddev: 0 };
+
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            const max = Math.max(...values);
+            const min = Math.min(...values);
+
+            const variance = values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length;
+            const stddev = Math.sqrt(variance);
+
+            return { avg, max, min, stddev };
+        }
+
+        function displayOverallStats(stats, dataPoints) {
+            document.getElementById('stat-total').textContent = dataPoints;
+            document.getElementById('stat-global-avg').textContent = stats.avg.toFixed(2) + '°C';
+            document.getElementById('stat-global-max').textContent = stats.max.toFixed(2) + '°C';
+            document.getElementById('stat-global-min').textContent = stats.min.toFixed(2) + '°C';
+            document.getElementById('stat-global-stddev').textContent = stats.stddev.toFixed(2) + '°C';
+        }
+
+        function displayPerSensorStats(perSensorStats, globalAvg, colors) {
+            const container = document.getElementById('perSensorStats');
+            container.innerHTML = '';
+
+            Object.entries(perSensorStats).forEach(([sensorName, data], index) => {
+                const stats = data.stats;
+                const deviations = data.deviationFromGlobal;
+                const avgDeviation = deviations.reduce((a, b) => a + b, 0) / deviations.length;
+
+                const borderColor = colors[index % colors.length];
+
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    background: var(--color-surface);
+                    border-left: 4px solid ${borderColor};
+                    padding: 15px;
+                    border-radius: 6px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                `;
+
+                card.innerHTML = `
+                    <div style="font-weight: 600; font-size: 13px; margin-bottom: 10px; color: ${borderColor};">
+                        ${sensorName}
+                    </div>
+                    <div style="font-size: 12px; color: var(--color-text-light); line-height: 1.8;">
+                        <div><strong>Average:</strong> ${stats.avg.toFixed(2)}°C</div>
+                        <div><strong>Max:</strong> ${stats.max.toFixed(2)}°C</div>
+                        <div><strong>Min:</strong> ${stats.min.toFixed(2)}°C</div>
+                        <div><strong>Std Dev:</strong> ${stats.stddev.toFixed(2)}°C</div>
+                        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-border);">
+                            <strong>Deviation from Global Avg:</strong> ${avgDeviation > 0 ? '+' : ''}${avgDeviation.toFixed(2)}°C
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
         async function downloadGraphData() {
             try {
                 window.location.href = '/api/graphs/download';
