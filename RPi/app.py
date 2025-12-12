@@ -491,13 +491,33 @@ class SerialReaderThread(threading.Thread):
                         parts = reading.split(':')
                         if len(parts) == 2:
                             sensor_id, temp_str = parts
+                            sensor_id = sensor_id.strip()  # Remove whitespace
+                            temp_str = temp_str.strip()
+
+                            # VALIDATION: Check if sensor_id looks valid (hexadecimal, 16+ chars or starts with 28)
+                            is_valid_sensor = False
+                            try:
+                                # Real DS18B20 IDs are 16 hex chars starting with 28, or mock format 280000...
+                                if len(sensor_id) >= 16:  # Must be at least 16 chars (hex)
+                                    int(sensor_id[:2], 16)  # First 2 chars must be valid hex
+                                    int(sensor_id[2:], 16)  # Rest must be valid hex
+                                    is_valid_sensor = True
+                            except (ValueError, IndexError):
+                                pass  # Not a valid sensor ID
+
+                            if not is_valid_sensor:
+                                msg = f"Invalid sensor ID (rejected): '{sensor_id}' - must be hexadecimal, 16+ characters"
+                                self.message_queue.add(msg, "warning")
+                                print(f"[PARSE] {msg}")
+                                continue  # Skip this invalid reading
+
                             current_ids.add(sensor_id)
-                            
+
                             try:
                                 temp = float(temp_str)
                                 self.data_manager.update_sensor(sensor_id, temp, "online")
                                 self.message_queue.add(reading, "temperature")
-                                
+
                                 # Log if currently logging
                                 if self.state_machine.logging_state == LoggingState.LOGGING:
                                     self.logger.log_reading(self.data_manager.get_sensors())
@@ -505,7 +525,7 @@ class SerialReaderThread(threading.Thread):
                                 msg = f"Invalid temperature value: {temp_str}"
                                 self.message_queue.add(msg, "warning")
                                 print(f"[PARSE] {msg}")
-                    
+
                     # ===== ERROR MESSAGES =====
                     elif 'ERROR' in reading.upper() or 'FAIL' in reading.upper():
                         self.message_queue.add(reading, "error")
