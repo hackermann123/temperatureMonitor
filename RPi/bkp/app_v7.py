@@ -1,8 +1,9 @@
-# Temperature Monitoring System - Flask Backend (v6.2 - FIXED)
-# All three issues addressed:
-# 1. Better mock sensor naming
-# 2. Improved sensor filtering logic
-# 3. Log folder configuration
+# Temperature Monitoring System - Flask Backend (v6.1 - FIXED)
+# Complete implementation with SerialMessageQueue and improved data handling
+# FIXES: 
+# 1. Added mock_mode to system_status response
+# 2. Better mock sensor naming with counters
+# 3. Improved sensor data management
 
 import os
 import json
@@ -212,19 +213,18 @@ class SensorDataManager:
         self.sensors = {}
         self.history = {}
         self.lock = threading.Lock()
-        self.mock_sensor_counter = 0  # Track number of mock sensors
+        self.mock_sensor_counter = {}  # Track mock sensor names
 
     def update_sensor(self, sensor_id, temperature, status="online"):
         """Update sensor reading"""
         with self.lock:
             if sensor_id not in self.sensors:
                 # Generate better name for mock sensors
-                if sensor_id.startswith('280000'):
-                    # This is a mock sensor - increment counter
-                    self.mock_sensor_counter += 1
-                    name = f"Mock Probe {self.mock_sensor_counter}"
+                if sensor_id.startswith('28000'):
+                    # This is a mock sensor
+                    mock_index = len([s for s in self.sensors if s.startswith('28000')])
+                    name = f"Mock Probe {mock_index + 1}"
                 else:
-                    # Real sensor
                     name = f"Probe {sensor_id[:8]}"
                 
                 self.sensors[sensor_id] = {
@@ -269,9 +269,6 @@ class SensorDataManager:
         with self.lock:
             if sensor_id in self.sensors:
                 self.sensors[sensor_id]["name"] = name
-                print(f"[SENSOR] Renamed {sensor_id} to '{name}'")
-                return True
-            return False
 
     def detect_disconnected(self, current_ids, timeout=30):
         """Detect sensors that haven't reported recently"""
@@ -311,7 +308,6 @@ class DataLogger:
                 self.current_handle.write(header + "\n")
                 self.current_handle.flush()
                 print(f"[LOGGER] Started new session: {filename}")
-                print(f"[LOGGER] Logging to: {filepath}")
                 return filename
             except Exception as e:
                 print(f"[LOGGER] Error starting session: {e}")
@@ -593,23 +589,13 @@ def rescan_probes():
 @app.route('/api/probes/rename', methods=['POST'])
 def rename_probe():
     """Rename a probe"""
-    try:
-        data = request.get_json()
-        sensor_id = data.get('sensor_id')
-        name = data.get('name')
-        
-        if not sensor_id or not name:
-            return jsonify({"error": "Missing parameters"}), 400
-        
-        success = data_manager.rename_sensor(sensor_id, name)
-        if success:
-            sensors = data_manager.get_sensors()
-            return jsonify({"status": "ok", "sensors": sensors})
-        else:
-            return jsonify({"error": "Sensor not found"}), 404
-    except Exception as e:
-        print(f"[API] Rename error: {e}")
-        return jsonify({"error": str(e)}), 500
+    data = request.get_json()
+    sensor_id = data.get('sensor_id')
+    name = data.get('name')
+    if not sensor_id or not name:
+        return jsonify({"error": "Missing parameters"}), 400
+    data_manager.rename_sensor(sensor_id, name)
+    return jsonify({"status": "ok"})
 
 @app.route('/api/logging/start', methods=['POST'])
 def start_logging():
@@ -617,39 +603,28 @@ def start_logging():
     global logging_thread, logger
     if not state_machine.can_start_logging():
         return jsonify({"error": "System not ready for logging"}), 400
-    
+    data = request.get_json()
+    folder = data.get('folder', LOG_FOLDER)
+    duration = data.get('duration')
+    interval = data.get('interval', 60)
     try:
-        data = request.get_json()
-        folder = data.get('folder', LOG_FOLDER).strip()
-        duration = data.get('duration')
-        interval = data.get('interval', 60)
-        
-        # Validate and create folder
-        if not folder:
-            folder = LOG_FOLDER
-        
         logger = DataLogger(folder)
         sensors = data_manager.get_sensors()
         filename = logger.start_session(sensors)
-        
         if not filename:
             return jsonify({"error": "Failed to create log file"}), 500
-        
         logging_thread = LoggingThread(data_manager, logger, state_machine, duration, interval)
         logging_thread.start()
         state_machine.set_logging_state(LoggingState.LOGGING)
         state_machine.set_state(SystemState.LOGGING)
-        
         return jsonify({
             "status": "ok",
             "filename": filename,
-            "folder": folder,
             "startTime": int(time.time() * 1000),
             "duration": duration,
             "interval": interval
         })
     except Exception as e:
-        print(f"[API] Logging start error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/logging/stop', methods=['POST'])
@@ -792,7 +767,7 @@ def system_status():
 
 def startup_sequence():
     """Initialize system on startup"""
-    print("[STARTUP] Initializing Temperature Monitoring System v6.2")
+    print("[STARTUP] Initializing Temperature Monitoring System v6.1")
     print(f"[STARTUP] Log folder: {LOG_FOLDER}")
     print("[STARTUP] Serial Message Queue: 100 messages max")
     Path(LOG_FOLDER).mkdir(parents=True, exist_ok=True)
