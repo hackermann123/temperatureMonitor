@@ -381,7 +381,9 @@
             }
         }
     </style>
-</head>
+
+    <!-- Chart.js for graph rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script></head>
 <body>
     <header>
         <div class="container">
@@ -823,20 +825,134 @@
                 const data = await response.json();
                 const sessionData = data.sessions[filename];
 
-                if (!sessionData) {
+                if (!sessionData || sessionData.length === 0) {
                     alert('No data available for this session');
                     return;
                 }
 
-                // Simple chart rendering (text-based for demo)
-                console.log('[GRAPH] Data loaded:', sessionData.length, 'readings');
+                // Prepare data for Chart.js
+                const timestamps = [];
+                const sensorDataMap = {};
+
+                sessionData.forEach(entry => {
+                    const date = new Date(entry.timestamp);
+                    const timeStr = date.toLocaleTimeString();
+                    timestamps.push(timeStr);
+
+                    // Organize data by sensor
+                    for (const [sensorName, temp] of Object.entries(entry.readings)) {
+                        if (!sensorDataMap[sensorName]) {
+                            sensorDataMap[sensorName] = [];
+                        }
+                        sensorDataMap[sensorName].push(temp);
+                    }
+                });
+
+                // Create datasets with different colors
+                const colors = [
+                    'rgb(33, 128, 181)',
+                    'rgb(230, 126, 34)',
+                    'rgb(46, 204, 113)',
+                    'rgb(231, 76, 60)',
+                    'rgb(155, 89, 182)',
+                    'rgb(52, 152, 219)',
+                    'rgb(241, 196, 15)'
+                ];
+
+                const datasets = Object.entries(sensorDataMap).map((entry, index) => ({
+                    label: entry[0],
+                    data: entry[1],
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '22',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 4,
+                    pointBackgroundColor: colors[index % colors.length],
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1
+                }));
+
+                // Render chart
+                const ctx = document.getElementById('temperatureChart').getContext('2d');
+
+                // Destroy existing chart if it exists
+                if (window.temperatureChartInstance) {
+                    window.temperatureChartInstance.destroy();
+                }
+
+                window.temperatureChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: timestamps,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    boxWidth: 12,
+                                    font: { size: 12 },
+                                    padding: 15,
+                                    color: '#333'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: `Temperature Data - ${filename.replace('temperature_log_', '').replace('.csv', '')}`,
+                                font: { size: 14, weight: 'bold' },
+                                color: '#333',
+                                padding: 20
+                            }
+                        },
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Temperature (°C)',
+                                    color: '#666'
+                                },
+                                grid: {
+                                    color: '#eee'
+                                },
+                                ticks: {
+                                    color: '#666'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time',
+                                    color: '#666'
+                                },
+                                grid: {
+                                    color: '#eee'
+                                },
+                                ticks: {
+                                    color: '#666',
+                                    maxRotation: 45,
+                                    minRotation: 0
+                                }
+                            }
+                        }
+                    }
+                });
+
+                console.log('[GRAPH] Chart rendered with', datasets.length, 'sensors and', timestamps.length, 'data points');
 
             } catch (error) {
                 console.error('[ERROR] Load graph data failed:', error);
+                alert('Error loading graph data: ' + error.message);
             }
-        }
-
-        async function downloadGraphData() {
+        }async function downloadGraphData() {
             try {
                 window.location.href = '/api/graphs/download';
             } catch (error) {
