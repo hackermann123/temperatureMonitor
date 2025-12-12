@@ -701,7 +701,7 @@
                     statusText.textContent = data.serial_connected ? 'Arduino Connected' : 'Arduino Offline';
                     
                     // Update mock mode state only if it changed
-                    const newMockState = data.mock_mode || false;
+                    const newMockState = data.mock_mode || false;  // ✅ Correct field name
                     if (newMockState !== mockModeEnabled) {
                         mockModeEnabled = newMockState;
                         updateMockModeButton();
