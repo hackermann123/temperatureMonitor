@@ -17,8 +17,8 @@
 #define ONE_WIRE_BUS 2           // OneWire data line on digital pin 2
 #define SENSOR_TIMEOUT 1000      // Milliseconds to wait for sensor response
 #define MAX_SENSORS 10           // Maximum number of sensors to track
-#define READ_INTERVAL 2000       // Milliseconds between sensor reads
-#define RESCAN_INTERVAL 60000    // Milliseconds between rescans (60 seconds)
+#define READ_INTERVAL 1000       // Milliseconds between sensor reads
+#define RESCAN_INTERVAL 10000    // Milliseconds between rescans (10 seconds)
 
 // ============================================================================
 // GLOBAL VARIABLES

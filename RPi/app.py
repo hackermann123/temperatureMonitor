@@ -1,8 +1,9 @@
-# Temperature Monitoring System - Flask Backend (v6.2 - FIXED)
-# All three issues addressed:
-# 1. Better mock sensor naming
-# 2. Improved sensor filtering logic
-# 3. Log folder configuration
+# Temperature Monitoring System - Flask Backend (v6.3 - CSV with Names)
+# FIXED: CSV now logs sensor names alongside addresses
+# Changes:
+# 1. CSV header includes both name and address
+# 2. Sensor mapping stored at logging start
+# 3. Log files show readable names instead of just hex IDs
 
 import os
 import json
@@ -290,6 +291,7 @@ class SensorDataManager:
 class DataLogger:
     """
     Handles CSV file creation and data logging with proper timestamps.
+    NOW INCLUDES SENSOR NAMES IN COLUMN HEADERS!
     """
     def __init__(self, folder="/home/pi/temperature_logs/"):
         self.folder = Path(folder)
@@ -297,9 +299,10 @@ class DataLogger:
         self.current_file = None
         self.current_handle = None
         self.lock = threading.Lock()
+        self.sensor_mapping = {}  # Maps sensor_id to (name, address)
 
     def start_session(self, sensors):
-        """Create new logging session file"""
+        """Create new logging session file with sensor names in headers"""
         with self.lock:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             filename = f"temperature_log_{timestamp}.csv"
@@ -307,24 +310,41 @@ class DataLogger:
             try:
                 self.current_handle = open(filepath, 'w')
                 self.current_file = filepath
-                header = "Timestamp," + ",".join([f"{name}" for name in sorted(sensors.keys())])
+                
+                # Store sensor mapping for later use
+                self.sensor_mapping = {sid: (s["name"], sid) for sid, s in sensors.items()}
+                
+                # Create header with BOTH name and address for each sensor
+                # Format: "Probe Name (Address)"
+                header_parts = ["Timestamp"]
+                for sensor_id in sorted(sensors.keys()):
+                    sensor = sensors[sensor_id]
+                    # Create readable column header: "Living Room (28abc123)"
+                    column_header = f"{sensor['name']} ({sensor_id[:8]})"
+                    header_parts.append(column_header)
+                
+                header = ",".join(header_parts)
                 self.current_handle.write(header + "\n")
                 self.current_handle.flush()
+                
                 print(f"[LOGGER] Started new session: {filename}")
                 print(f"[LOGGER] Logging to: {filepath}")
+                print(f"[LOGGER] Column headers: {header}")
                 return filename
             except Exception as e:
                 print(f"[LOGGER] Error starting session: {e}")
                 return None
 
     def log_reading(self, sensors_dict):
-        """Log current sensor readings"""
+        """Log current sensor readings using stored mapping"""
         with self.lock:
             if not self.current_handle:
                 return False
             try:
                 timestamp = datetime.now().isoformat()
                 row = timestamp
+                
+                # Log in same order as header
                 for sensor_id in sorted(sensors_dict.keys()):
                     sensor = sensors_dict[sensor_id]
                     if sensor["status"] == "online":
@@ -332,6 +352,7 @@ class DataLogger:
                     else:
                         value = "NC"
                     row += f",{value}"
+                
                 self.current_handle.write(row + "\n")
                 self.current_handle.flush()
                 return True
@@ -348,6 +369,7 @@ class DataLogger:
                     filename = self.current_file.name
                     self.current_handle = None
                     self.current_file = None
+                    self.sensor_mapping = {}
                     print(f"[LOGGER] Session ended: {filename}")
                     return filename
                 except Exception as e:
@@ -792,9 +814,10 @@ def system_status():
 
 def startup_sequence():
     """Initialize system on startup"""
-    print("[STARTUP] Initializing Temperature Monitoring System v6.2")
+    print("[STARTUP] Initializing Temperature Monitoring System v6.3")
     print(f"[STARTUP] Log folder: {LOG_FOLDER}")
     print("[STARTUP] Serial Message Queue: 100 messages max")
+    print("[STARTUP] CSV logging: Now includes sensor names!")
     Path(LOG_FOLDER).mkdir(parents=True, exist_ok=True)
     reader = SerialReaderThread(serial_handler, data_manager, state_machine, logger, serial_message_queue)
     reader.start()
