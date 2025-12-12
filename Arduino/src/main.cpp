@@ -29,7 +29,7 @@ const int ONE_WIRE_BUS = 2;  // Change if using different pin
 // 10-bit: 0.25°C steps,  ~188ms conversion
 // 11-bit: 0.125°C steps, ~375ms conversion
 // 12-bit: 0.0625°C steps, ~750ms conversion (default)
-const int TEMPERATURE_RESOLUTION = 11;  // Change for faster/slower polling
+const int TEMPERATURE_RESOLUTION = 10;  // Change for faster/slower polling
 
 // Polling interval (milliseconds)
 // Safe minimum depends on resolution:
@@ -37,7 +37,7 @@ const int TEMPERATURE_RESOLUTION = 11;  // Change for faster/slower polling
 // 10-bit: 200ms+
 // 11-bit: 400ms+
 // 12-bit: 800ms+
-const unsigned long POLL_INTERVAL = 150;  // 150ms safe for 9-bit resolution
+const unsigned long POLL_INTERVAL = 250;  // 250ms safe for 10-bit resolution
 
 // Serial communication
 const long SERIAL_BAUD = 9600;
