@@ -366,7 +366,7 @@ class DataLogger:
     Handles CSV file creation and data logging with proper timestamps.
     NOW INCLUDES HEATER THERMISTOR IN COLUMN HEADERS!
     """
-    def __init__(self, folder="/home/pi/temperature_logs/"):
+    def __init__(self, folder="/home/vbio/TemperatureMonitor/temperatureMonitor/RPi/logs/"):
         self.folder = Path(folder)
         self.folder.mkdir(parents=True, exist_ok=True)
         self.current_file = None
@@ -744,7 +744,7 @@ logging_thread = None
 # Config
 SERIAL_PORT = "/dev/ttyACM0"
 SERIAL_BAUDRATE = 9600
-LOG_FOLDER = "/home/pi/temperature_logs/"
+LOG_FOLDER = "/home/vbio/TemperatureMonitor/temperatureMonitor/RPi/logs/"
 
 # ============================================================================
 
