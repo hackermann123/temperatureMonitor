@@ -934,9 +934,9 @@
          * This ensures graphs show only the friendly probe name, not the ID
          */
         function getDisplayName(rawName) {
-            // Strip trailing " (XXXXXXXX)" if present
-            const match = rawName.match(/^(.*?)(\s*\([0-9A-Fa-f]{1,8}\))$/);
-            return match ? match[1].trim() : rawName;
+            // Strip trailing (XXXXXXXX) if present, otherwise return as-is
+            const match = rawName.match(/^(.+?)\s*\([0-9A-Fa-f]{8}\)\s*$/);
+            return match ? match[1].trim() : rawName.trim();
         }
 
         async function refreshSessions() {

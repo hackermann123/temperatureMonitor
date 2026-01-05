@@ -393,7 +393,7 @@ class DataLogger:
                 header_parts = ["Timestamp"]
                 for sensor_id in sorted(sensors.keys()):
                     sensor = sensors[sensor_id]
-                    column_header = f"{sensor['name']} ({sensor_id[:8]})"
+                    column_header = sensor['name']
                     header_parts.append(column_header)
 
                 # Add heater thermistor column
