@@ -19,7 +19,24 @@ import math
 # ============================================================================
 # HEATER TEMPERATURE CONTROLLER
 # ============================================================================
+class TemperatureSystemStateMachine:
+    pass
 
+
+class SerialHandler:
+    pass
+
+
+class SensorDataManager:
+    pass
+
+
+class DataLogger:
+    pass
+
+
+class SerialMessageQueue:
+    pass
 class HeaterTemperatureReader:
     """Read temperature from MCP3204 thermistor (heater circuit)"""
     
