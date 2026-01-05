@@ -1,6 +1,6 @@
 # Temperature Monitoring System - Flask Backend (v6.5 - WITH DELETE PROBE + HEATER THERMISTOR)
 
-# The heating_control.py program should write heater temp to: /tmp/heater_thermistor.json
+# The heating_control.py program should write heater temp to: /tmp/heater_data.json
 
 import os
 import json
@@ -25,7 +25,7 @@ class HeaterThermistorReader:
     Reads heater thermistor temperature from a JSON file written by heating_control.py
     File format: {"temperature_c": 25.5, "timestamp": 1234567890.123}
     """
-    def __init__(self, temp_file="/tmp/heater_thermistor.json"):
+    def __init__(self, temp_file="/tmp/heater_data.json"):
         self.temp_file = Path(temp_file)
         self.last_temp = None
         self.last_timestamp = None
@@ -1056,7 +1056,7 @@ def startup_sequence():
     print(f"[STARTUP] Log folder: {LOG_FOLDER}")
     print("[STARTUP] Serial Message Queue: 100 messages max")
     print("[STARTUP] CSV logging: Now includes sensor names AND heater thermistor!")
-    print("[STARTUP] Heater thermistor source: /tmp/heater_thermistor.json")
+    print("[STARTUP] Heater thermistor source: /tmp/heater_data.json")
     print("[STARTUP] Probe management: Includes DELETE functionality!")
 
     Path(LOG_FOLDER).mkdir(parents=True, exist_ok=True)
