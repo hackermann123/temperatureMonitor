@@ -974,6 +974,9 @@
                     return;
                 }
 
+                // ===== LOAD SAVED PROBE NAMES =====
+                const savedNames = loadProbeNames();
+
                 // ===== DATA PREPARATION =====
 
                 const timestamps = [];
@@ -986,10 +989,22 @@
                     timestamps.push(timeStr);
 
                     for (const [sensorName, temp] of Object.entries(entry.readings)) {
-                        if (!sensorDataMap[sensorName]) {
-                            sensorDataMap[sensorName] = [];
+                        // Extract sensor ID from header (last 8 chars from the ID in parentheses)
+                        // Header format: "Probe Name (12345678)"
+                        const idMatch = sensorName.match(/\(([0-9A-Fa-f]+)\)$/);
+                        const sensorId = idMatch ? idMatch[1] : null;
+
+                        // Use saved name if available, otherwise use the header name
+                        let displaySensorName = sensorName;
+                        if (sensorId && savedNames[sensorId]) {
+                            // Reconstruct with saved name but keep the ID
+                            displaySensorName = `${savedNames[sensorId]} (${sensorId.slice(0, 8)})`;
                         }
-                        sensorDataMap[sensorName].push(temp);
+
+                        if (!sensorDataMap[displaySensorName]) {
+                            sensorDataMap[displaySensorName] = [];
+                        }
+                        sensorDataMap[displaySensorName].push(temp);
 
                         if (temp !== null) {
                             allTemperatures.push(temp);
