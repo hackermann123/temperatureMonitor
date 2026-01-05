@@ -1,6 +1,5 @@
-# Temperature Monitoring System - Flask Backend (v6.5 - WITH HEATER CONTROL)
-
-# UPDATED: Now includes heater temperature logging and control
+# Temperature Monitoring System - Flask Backend (v6.4 - WITH DELETE PROBE)
+# UPDATED: Now includes probe deletion functionality
 
 import os
 import json
@@ -153,6 +152,7 @@ class SerialHandler:
                 self.is_connected = True
                 print("[SERIAL] Mock mode enabled")
                 return True
+            
             self.ser = serial.Serial(self.port, self.baudrate, timeout=1)
             self.is_connected = True
             print(f"[SERIAL] Connected to {self.port} at {self.baudrate} baud")
@@ -168,9 +168,11 @@ class SerialHandler:
         try:
             if self.use_mock:
                 return self._generate_mock_data()
+            
             if self.ser and self.ser.in_waiting:
                 line = self.ser.readline().decode('utf-8').strip()
                 return line if line else None
+            
             return None
         except Exception as e:
             print(f"[SERIAL] Read error: {e}")
@@ -180,12 +182,15 @@ class SerialHandler:
         """Generate mock sensor data for testing"""
         self.mock_counter += 1
         import random
+        
         num_sensors = random.randint(2, 5)
         sensors = []
+        
         for i in range(num_sensors):
             sensor_id = f"28{i:016x}"
             temp = 20 + random.uniform(-5, 15) + (self.mock_counter % 100) * 0.01
             sensors.append(f"{sensor_id}:{temp:.2f}")
+        
         data = ",".join(sensors)
         time.sleep(0.5)
         return data
@@ -222,6 +227,7 @@ class SensorDataManager:
                     name = f"Mock Probe {self.mock_sensor_counter}"
                 else:
                     name = f"Probe {sensor_id[:8]}"
+                
                 self.sensors[sensor_id] = {
                     "temperature": temperature,
                     "status": status,
@@ -244,6 +250,7 @@ class SensorDataManager:
         with self.lock:
             if sensor_id not in self.history:
                 self.history[sensor_id] = []
+            
             self.history[sensor_id].append({
                 "temperature": temperature,
                 "timestamp": timestamp or time.time()
@@ -274,9 +281,11 @@ class SensorDataManager:
             if sensor_id in self.sensors:
                 name = self.sensors[sensor_id]["name"]
                 del self.sensors[sensor_id]
+                
                 # Also remove from history if exists
                 if sensor_id in self.history:
                     del self.history[sensor_id]
+                
                 print(f"[SENSOR] Deleted {sensor_id} ({name})")
                 return True
             return False
@@ -298,7 +307,7 @@ class SensorDataManager:
 class DataLogger:
     """
     Handles CSV file creation and data logging with proper timestamps.
-    NOW INCLUDES HEATER THERMISTOR LOGGING!
+    NOW INCLUDES SENSOR NAMES IN COLUMN HEADERS!
     """
     def __init__(self, folder="/home/pi/temperature_logs/"):
         self.folder = Path(folder)
@@ -307,66 +316,52 @@ class DataLogger:
         self.current_handle = None
         self.lock = threading.Lock()
         self.sensor_mapping = {}
-        self.has_heater = False
 
-    def start_session(self, sensors, has_heater=False):
+    def start_session(self, sensors):
         """Create new logging session file with sensor names in headers"""
         with self.lock:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             filename = f"temperature_log_{timestamp}.csv"
             filepath = self.folder / filename
+            
             try:
                 self.current_handle = open(filepath, 'w')
                 self.current_file = filepath
-                self.has_heater = has_heater
-
+                
                 # Store sensor mapping for later use
                 self.sensor_mapping = {sid: (s["name"], sid) for sid, s in sensors.items()}
-
-                # Create header with heater first (if present), then probes
+                
+                # Create header with BOTH name and address for each sensor
                 header_parts = ["Timestamp"]
-                
-                # Add heater thermistor if available
-                if has_heater:
-                    header_parts.append("Heater Thermistor (°C)")
-                
-                # Add all probes
                 for sensor_id in sorted(sensors.keys()):
                     sensor = sensors[sensor_id]
                     column_header = f"{sensor['name']} ({sensor_id[:8]})"
                     header_parts.append(column_header)
-
+                
                 header = ",".join(header_parts)
                 self.current_handle.write(header + "\n")
                 self.current_handle.flush()
-
+                
                 print(f"[LOGGER] Started new session: {filename}")
                 print(f"[LOGGER] Logging to: {filepath}")
                 print(f"[LOGGER] Column headers: {header}")
+                
                 return filename
-
             except Exception as e:
                 print(f"[LOGGER] Error starting session: {e}")
                 return None
 
-    def log_reading(self, sensors_dict, heater_temp=None):
-        """Log current sensor readings with optional heater temperature"""
+    def log_reading(self, sensors_dict):
+        """Log current sensor readings using stored mapping"""
         with self.lock:
             if not self.current_handle:
                 return False
-
+            
             try:
                 timestamp = datetime.now().isoformat()
                 row = timestamp
-
-                # Add heater temperature if available
-                if self.has_heater:
-                    if heater_temp is not None:
-                        row += f",{heater_temp:.2f}"
-                    else:
-                        row += ",NC"
-
-                # Log probes in same order as header
+                
+                # Log in same order as header
                 for sensor_id in sorted(sensors_dict.keys()):
                     sensor = sensors_dict[sensor_id]
                     if sensor["status"] == "online":
@@ -374,11 +369,10 @@ class DataLogger:
                     else:
                         value = "NC"
                     row += f",{value}"
-
+                
                 self.current_handle.write(row + "\n")
                 self.current_handle.flush()
                 return True
-
             except Exception as e:
                 print(f"[LOGGER] Error logging reading: {e}")
                 return False
@@ -393,7 +387,6 @@ class DataLogger:
                     self.current_handle = None
                     self.current_file = None
                     self.sensor_mapping = {}
-                    self.has_heater = False
                     print(f"[LOGGER] Session ended: {filename}")
                     return filename
                 except Exception as e:
@@ -408,13 +401,13 @@ class DataLogger:
             if not filepath.exists():
                 print(f"[LOGGER] File not found: {filepath}")
                 return None
-
+            
             data = []
             with open(filepath, 'r') as f:
                 lines = f.readlines()
                 if not lines:
                     return None
-
+                
                 headers = lines[0].strip().split(',')[1:]
                 for line in lines[1:]:
                     values = line.strip().split(',')
@@ -427,12 +420,10 @@ class DataLogger:
                                 readings[header] = float(val) if val != "NC" else None
                             except (ValueError, IndexError):
                                 readings[header] = None
-
                         data.append({"timestamp": timestamp, "readings": readings})
-
+            
             print(f"[LOGGER] Loaded {len(data)} rows from {filename}")
             return data
-
         except Exception as e:
             print(f"[LOGGER] Error loading session {filename}: {e}")
             return None
@@ -448,7 +439,7 @@ class DataLogger:
 class SerialReaderThread(threading.Thread):
     """
     Continuously reads from Arduino and updates sensor data.
-    Now with heater temperature support.
+    Now with improved message handling and Serial Monitor support.
     """
     def __init__(self, serial_handler, data_manager, state_machine, logger, message_queue):
         super().__init__(daemon=True)
@@ -463,86 +454,73 @@ class SerialReaderThread(threading.Thread):
     def run(self):
         """Main thread loop"""
         last_rescan = 0
+        
         while self.running:
             # Connection management
             if not self.serial_handler.is_connected:
                 if not self.serial_handler.connect():
                     self.state_machine.set_state(SystemState.WAITING_FOR_SERIAL,
-                                                "No Arduino connection")
+                                               "No Arduino connection")
                     time.sleep(5)
                     continue
                 else:
                     self.state_machine.set_state(SystemState.READING)
-
+            
             # Read data from Arduino
             line = self.serial_handler.read_line()
             if not line:
                 time.sleep(0.1)
                 continue
-
+            
             # Log raw data to Serial Monitor
             self.message_queue.add(line, "raw")
-
+            
             try:
                 current_ids = set()
                 readings = line.split(',')
+                
                 for reading in readings:
                     reading = reading.strip()
-
+                    
                     # Skip empty readings
                     if not reading:
                         continue
-
-                    # ===== HEATER TEMPERATURE =====
-                    if reading.upper().startswith('HEATER:'):
-                        try:
-                            heater_temp_str = reading.split(':')[1].strip()
-                            heater_temp = float(heater_temp_str)
-                            # Store heater temperature globally
-                            global heater_reading
-                            heater_reading = heater_temp
-                            self.message_queue.add(reading, "temperature")
-                            print(f"[HEATER] Temperature: {heater_temp:.2f}°C")
-                            # Log if currently logging
-                            if self.state_machine.logging_state == LoggingState.LOGGING:
-                                self.logger.log_reading(self.data_manager.get_sensors(), heater_temp)
-                        except ValueError:
-                            msg = f"Invalid heater temperature value: {reading}"
-                            self.message_queue.add(msg, "warning")
-                            print(f"[PARSE] {msg}")
-
+                    
                     # ===== TEMPERATURE DATA =====
-                    elif ':' in reading and not any(x in reading.upper() for x in ['ERROR', 'WARN', 'FAIL', 'INFO']):
+                    if ':' in reading and not any(x in reading.upper() for x in ['ERROR', 'WARN', 'FAIL', 'INFO']):
                         parts = reading.split(':')
                         if len(parts) == 2:
                             sensor_id, temp_str = parts
-                            sensor_id = sensor_id.strip()
+                            sensor_id = sensor_id.strip()  # Remove whitespace
                             temp_str = temp_str.strip()
 
-                            # VALIDATION: Check if sensor_id looks valid
+                            # VALIDATION: Check if sensor_id looks valid (hexadecimal, 16+ chars or starts with 28)
                             is_valid_sensor = False
                             try:
-                                if len(sensor_id) >= 16:
-                                    int(sensor_id[:2], 16)
-                                    int(sensor_id[2:], 16)
+                                # Real DS18B20 IDs are 16 hex chars starting with 28, or mock format 280000...
+                                if len(sensor_id) >= 16:  # Must be at least 16 chars (hex)
+                                    int(sensor_id[:2], 16)  # First 2 chars must be valid hex
+                                    int(sensor_id[2:], 16)  # Rest must be valid hex
                                     is_valid_sensor = True
                             except (ValueError, IndexError):
-                                pass
+                                pass  # Not a valid sensor ID
 
                             if not is_valid_sensor:
                                 msg = f"Invalid sensor ID (rejected): '{sensor_id}' - must be hexadecimal, 16+ characters"
                                 self.message_queue.add(msg, "warning")
                                 print(f"[PARSE] {msg}")
-                                continue
+                                continue  # Skip this invalid reading
 
                             current_ids.add(sensor_id)
+
                             try:
                                 temp = float(temp_str)
                                 self.data_manager.update_sensor(sensor_id, temp, "online")
                                 self.message_queue.add(reading, "temperature")
+
                                 # Log if currently logging
                                 if self.state_machine.logging_state == LoggingState.LOGGING:
-                                    self.logger.log_reading(self.data_manager.get_sensors(), heater_reading)
+                                    self.logger.log_reading(self.data_manager.get_sensors())
                             except ValueError:
                                 msg = f"Invalid temperature value: {temp_str}"
                                 self.message_queue.add(msg, "warning")
@@ -552,38 +530,38 @@ class SerialReaderThread(threading.Thread):
                     elif 'ERROR' in reading.upper() or 'FAIL' in reading.upper():
                         self.message_queue.add(reading, "error")
                         print(f"[ARDUINO_ERROR] {reading}")
-
+                    
                     # ===== WARNING MESSAGES =====
                     elif 'WARN' in reading.upper() or 'OFFLINE' in reading.upper():
                         self.message_queue.add(reading, "warning")
                         print(f"[ARDUINO_WARN] {reading}")
-
+                    
                     elif 'Invalid' in reading:
                         self.message_queue.add(reading, "warning")
                         print(f"[ARDUINO_WARN] {reading}")
-
+                    
                     # ===== INFO MESSAGES =====
                     elif 'INFO' in reading.upper() or any(x in reading.upper() for x in ['RESCAN', 'FOUND', 'COMPLETE']):
                         self.message_queue.add(reading, "info")
                         print(f"[ARDUINO_INFO] {reading}")
-
+                    
                     # ===== UNKNOWN FORMAT =====
                     else:
                         self.message_queue.add(reading, "unknown")
                         print(f"[ARDUINO_UNKNOWN] {reading}")
-
+                
                 # Update state if needed
                 if self.state_machine.current_state == SystemState.WAITING_FOR_SERIAL:
                     self.state_machine.set_state(SystemState.READING)
-
+                
                 # Detect disconnected sensors
                 self.data_manager.detect_disconnected(current_ids, self.disconnect_timeout)
-
+            
             except Exception as e:
                 msg = f"Parse error: {e}"
                 self.message_queue.add(msg, "error")
                 print(f"[READER] {msg}")
-
+            
             time.sleep(0.1)
 
     def stop(self):
@@ -614,22 +592,22 @@ class LoggingThread(threading.Thread):
         self.running = True
         self.start_time = time.time()
         last_log = self.start_time
-
+        
         while self.running:
             current_time = time.time()
             elapsed = current_time - self.start_time
-
+            
             if self.duration and elapsed > self.duration:
                 print("[LOGGER] Duration limit reached")
                 self.running = False
                 break
-
+            
             if current_time - last_log >= self.interval:
                 sensors = self.data_manager.get_sensors()
                 if sensors:
-                    self.logger.log_reading(sensors, heater_reading)
+                    self.logger.log_reading(sensors)
                 last_log = current_time
-
+            
             time.sleep(0.5)
 
     def stop(self):
@@ -649,10 +627,6 @@ serial_handler = SerialHandler(use_mock=False)
 data_manager = SensorDataManager()
 logger = DataLogger()
 serial_message_queue = SerialMessageQueue(max_messages=100)
-
-# Global heater control variables
-heater_target_temp = None
-heater_reading = None
 
 # Global logging thread
 logging_thread = None
@@ -695,18 +669,17 @@ def rename_probe():
         data = request.get_json()
         sensor_id = data.get('sensor_id')
         name = data.get('name')
-
+        
         if not sensor_id or not name:
             return jsonify({"error": "Missing parameters"}), 400
-
+        
         success = data_manager.rename_sensor(sensor_id, name)
-
+        
         if success:
             sensors = data_manager.get_sensors()
             return jsonify({"status": "ok", "sensors": sensors})
         else:
             return jsonify({"error": "Sensor not found"}), 404
-
     except Exception as e:
         print(f"[API] Rename error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -717,109 +690,60 @@ def delete_probe():
     try:
         data = request.get_json()
         sensor_id = data.get('sensor_id')
-
+        
         if not sensor_id:
             return jsonify({"error": "Missing sensor_id"}), 400
-
+        
         success = data_manager.delete_sensor(sensor_id)
-
+        
         if success:
             sensors = data_manager.get_sensors()
             return jsonify({"status": "ok", "sensors": sensors})
         else:
             return jsonify({"error": "Sensor not found"}), 404
-
     except Exception as e:
         print(f"[API] Delete error: {e}")
         return jsonify({"error": str(e)}), 500
-
-@app.route('/api/heater/set', methods=['POST'])
-def set_heater_temp():
-    """Set heater target temperature"""
-    global heater_target_temp
-    try:
-        data = request.get_json()
-        target_temp = data.get('target_temp')
-
-        if target_temp is None:
-            return jsonify({"error": "Missing target_temp"}), 400
-
-        try:
-            target_temp = float(target_temp)
-        except ValueError:
-            return jsonify({"error": "Invalid temperature value"}), 400
-
-        # Validate range (0-80°C)
-        if target_temp < 0 or target_temp > 80:
-            return jsonify({"error": "Temperature must be between 0-80°C"}), 400
-
-        heater_target_temp = target_temp
-
-        # Optionally send command to Arduino if needed
-        # For now, just store the value
-        print(f"[HEATER] Target temperature set to {target_temp}°C")
-
-        return jsonify({
-            "status": "ok",
-            "heater_target_temp": heater_target_temp,
-            "heater_current_temp": heater_reading
-        })
-
-    except Exception as e:
-        print(f"[API] Heater set error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/heater/status', methods=['GET'])
-def get_heater_status():
-    """Get heater status (target and current temperature)"""
-    return jsonify({
-        "target_temp": heater_target_temp,
-        "current_temp": heater_reading
-    })
 
 @app.route('/api/logging/start', methods=['POST'])
 def start_logging():
     """Start data logging session"""
     global logging_thread, logger
-
+    
     if not state_machine.can_start_logging():
         return jsonify({"error": "System not ready for logging"}), 400
-
+    
     try:
         data = request.get_json()
         folder = data.get('folder', LOG_FOLDER).strip()
         duration = data.get('duration')
         interval = data.get('interval', 60)
-        has_heater = data.get('has_heater', heater_target_temp is not None)
-
+        
         # Validate and create folder
         if not folder:
             folder = LOG_FOLDER
-
+        
         logger = DataLogger(folder)
-
         sensors = data_manager.get_sensors()
-        filename = logger.start_session(sensors, has_heater=has_heater)
-
+        filename = logger.start_session(sensors)
+        
         if not filename:
             return jsonify({"error": "Failed to create log file"}), 500
-
+        
         logging_thread = LoggingThread(data_manager, logger, state_machine, duration, interval)
         logging_thread.start()
-
+        
         state_machine.set_logging_state(LoggingState.LOGGING)
         state_machine.set_state(SystemState.LOGGING)
-
+        
         return jsonify({
             "status": "ok",
             "filename": filename,
             "folder": folder,
             "startTime": int(time.time() * 1000),
             "duration": duration,
-            "interval": interval,
-            "has_heater": has_heater
+            "interval": interval
         })
-
     except Exception as e:
         print(f"[API] Logging start error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -828,22 +752,20 @@ def start_logging():
 def stop_logging():
     """Stop current logging session"""
     global logging_thread, logger
-
+    
     try:
         if logging_thread and logging_thread.running:
             logging_thread.stop()
             logging_thread.join(timeout=5)
-
+        
         filename = logger.end_session()
-
         state_machine.set_logging_state(LoggingState.IDLE)
         state_machine.set_state(SystemState.READING)
-
+        
         if filename:
             return jsonify({"status": "ok", "filename": filename})
         else:
             return jsonify({"status": "error", "error": "Failed to close log file"}), 500
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -853,24 +775,24 @@ def get_graph_data():
     try:
         log_folder = Path(LOG_FOLDER)
         log_folder.mkdir(parents=True, exist_ok=True)
-
+        
         requested_file = request.args.get('file')
         csv_files = sorted(log_folder.glob("temperature_log_*.csv"))
-
+        
         if not csv_files:
             return jsonify({"sessions": {}, "files": []})
-
+        
         files_list = [f.name for f in csv_files]
-
+        
         if requested_file:
             requested_path = log_folder / requested_file
             if requested_path.exists():
                 csv_files = [requested_path]
             else:
                 csv_files = []
-
+        
         sessions = {}
-
+        
         for csv_file in csv_files:
             data = []
             try:
@@ -878,32 +800,28 @@ def get_graph_data():
                     lines = f.readlines()
                     if not lines:
                         continue
-
+                    
                     headers = lines[0].strip().split(",")[1:]
-
+                    
                     for line in lines[1:]:
                         values = line.strip().split(",")
                         if len(values) > 1:
                             timestamp = values[0]
                             readings = {}
-
                             for i, header in enumerate(headers):
                                 try:
                                     val = values[i + 1]
                                     readings[header] = float(val) if val != "NC" else None
                                 except (ValueError, IndexError):
                                     readings[header] = None
-
                             data.append({"timestamp": timestamp, "readings": readings})
-
+                
                 if data:
                     sessions[csv_file.name] = data
-
             except Exception as e:
                 print(f"[GRAPHS] Error loading {csv_file.name}: {e}")
-
+        
         return jsonify({"sessions": sessions, "files": files_list})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -913,21 +831,20 @@ def download_graph_csv():
     try:
         log_folder = Path(LOG_FOLDER)
         log_folder.mkdir(parents=True, exist_ok=True)
-
+        
         csv_files = sorted(log_folder.glob("temperature_log_*.csv"))
-
+        
         if not csv_files:
             return jsonify({"error": "No data available"}), 404
-
+        
         combined_file = log_folder / "combined_export.csv"
-
+        
         with open(combined_file, 'w') as outfile:
             for csv_file in csv_files:
                 with open(csv_file, 'r') as infile:
                     outfile.write(infile.read())
-
+        
         return send_file(combined_file, as_attachment=True, download_name="temperature_data.csv")
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -935,6 +852,7 @@ def download_graph_csv():
 def enable_mock_mode():
     """Enable mock mode"""
     global serial_handler
+    
     try:
         serial_handler.use_mock = True
         msg = "Mock mode ENABLED - generating test data"
@@ -948,6 +866,7 @@ def enable_mock_mode():
 def disable_mock_mode():
     """Disable mock mode"""
     global serial_handler, data_manager
+    
     try:
         serial_handler.use_mock = False
         data_manager.sensors.clear()
@@ -973,17 +892,15 @@ def clear_serial_messages():
 
 @app.route('/api/system/status', methods=['GET'])
 def system_status():
-    """Get system status - INCLUDES heater info"""
+    """Get system status - INCLUDES mock_mode field"""
     state, logging_state, error = state_machine.get_state()
-
+    
     return jsonify({
         "system_state": state.value,
         "logging_state": logging_state.value,
         "error": error,
         "serial_connected": serial_handler.is_connected,
-        "mock_mode": serial_handler.use_mock,
-        "heater_target_temp": heater_target_temp,
-        "heater_current_temp": heater_reading
+        "mock_mode": serial_handler.use_mock
     })
 
 # ============================================================================
@@ -992,18 +909,17 @@ def system_status():
 
 def startup_sequence():
     """Initialize system on startup"""
-    print("[STARTUP] Initializing Temperature Monitoring System v6.5 (WITH HEATER CONTROL)")
+    print("[STARTUP] Initializing Temperature Monitoring System v6.4 (WITH DELETE PROBE)")
     print(f"[STARTUP] Log folder: {LOG_FOLDER}")
     print("[STARTUP] Serial Message Queue: 100 messages max")
-    print("[STARTUP] CSV logging: Now includes sensor names and heater thermistor!")
-    print("[STARTUP] Probe management: Delete, rename, and rescan support")
-    print("[STARTUP] Heater control: Set target temperature and log readings")
-
+    print("[STARTUP] CSV logging: Now includes sensor names!")
+    print("[STARTUP] Probe management: Now includes DELETE functionality!")
+    
     Path(LOG_FOLDER).mkdir(parents=True, exist_ok=True)
-
+    
     reader = SerialReaderThread(serial_handler, data_manager, state_machine, logger, serial_message_queue)
     reader.start()
-
+    
     print("[STARTUP] Serial reader thread started")
     print("[STARTUP] System ready")
 
