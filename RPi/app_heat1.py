@@ -1,4 +1,5 @@
-# Temperature Monitoring System - Flask Backend (v6.7 - COLON DELIMITER FIX)
+# Temperature Monitoring System - Flask Backend (v6.5 - WITH DELETE PROBE + HEATER THERMISTOR)
+
 # The heating_control.py program should write heater temp to: /tmp/heater_thermistor.json
 
 import os
@@ -224,7 +225,7 @@ class SerialHandler:
         for i in range(num_sensors):
             sensor_id = f"28{i:016x}"
             temp = 20 + random.uniform(-5, 15) + self.mock_counter * 0.01
-            sensors.append(f"{sensor_id}:{temp:.2f}")
+            sensors.append(f"{sensor_id},{temp:.2f}")
         data = ",".join(sensors)
         time.sleep(0.5)
         return data
@@ -506,7 +507,6 @@ class SerialReaderThread(threading.Thread):
 
             # Log raw data to Serial Monitor
             self.message_queue.add(line, "raw")
-            print(f"[SERIAL] Raw line received: {line}")
 
             try:
                 current_ids = set()
@@ -518,35 +518,28 @@ class SerialReaderThread(threading.Thread):
                     if not reading:
                         continue
 
-                    # VALIDATION: Check if this looks like a temperature reading (colon, space, or comma separated)
-                    if any(sep in reading for sep in [":", " ", ","]) and not any(x in reading.upper() for x in ["ERROR", "WARN", "FAIL", "INFO"]):
-                        # Try colon first, then comma, then space
-                        if ":" in reading:
-                            parts = reading.split(":")
-                        elif "," in reading:
-                            parts = reading.split(",")
-                        else:
-                            parts = reading.split()
-                        
+                    # VALIDATION: Check if this looks like a temperature reading
+                    if " " in reading and not any(x in reading.upper() for x in ["ERROR", "WARN", "FAIL", "INFO"]):
+                        parts = reading.split()
                         if len(parts) >= 2:
                             sensor_id = parts[0].strip()
                             temp_str = parts[1].strip()
 
-                            # TEMPERATURE DATA VALIDATION - accept any hex string 8+ chars with valid float temp
+                            # TEMPERATURE DATA VALIDATION
                             is_valid_sensor = False
                             try:
-                                # Try to parse as float first to validate temperature
-                                temp = float(temp_str)
-                                # Check if sensor_id looks valid (hex chars, at least 8 chars)
-                                if len(sensor_id) >= 8 and all(c in "0123456789ABCDEFabcdef" for c in sensor_id):
+                                # Check if sensor_id looks valid (hexadecimal, 16 chars, or starts with 28)
+                                if len(sensor_id) >= 16:
+                                    int(sensor_id[:2], 16)  # First 2 chars must be valid hex
+                                    int(sensor_id[2:], 16)  # Rest must be valid hex
                                     is_valid_sensor = True
-                            except ValueError:
-                                pass  # Not a valid temperature value
+                            except (ValueError, IndexError):
+                                pass  # Not a valid sensor ID
 
                             if not is_valid_sensor:
-                                msg = f"[PARSE] Raw reading rejected: '{reading}' - sensor_id='{sensor_id}' (need 8+ hex chars), temp='{temp_str}' (need valid number)"
+                                msg = f"Invalid sensor ID rejected: {sensor_id} - must be hexadecimal, 16+ characters"
                                 self.message_queue.add(msg, "warning")
-                                print(msg)
+                                print(f"[PARSE] {msg}")
                                 continue
 
                             current_ids.add(sensor_id)
@@ -554,7 +547,6 @@ class SerialReaderThread(threading.Thread):
                                 temp = float(temp_str)
                                 self.data_manager.update_sensor(sensor_id, temp, "online")
                                 self.message_queue.add(reading, "temperature")
-                                print(f"[PARSE] ✓ Sensor {sensor_id[:8]}... temp={temp:.2f}°C")
 
                                 # Log if currently logging
                                 if self.state_machine.logging_state == LoggingState.LOGGING:
@@ -937,13 +929,12 @@ def system_status():
 
 def startup_sequence():
     """Initialize system on startup"""
-    print("[STARTUP] Initializing Temperature Monitoring System v6.7 WITH HEATER THERMISTOR + COLON DELIMITER")
+    print("[STARTUP] Initializing Temperature Monitoring System v6.5 WITH HEATER THERMISTOR")
     print(f"[STARTUP] Log folder: {LOG_FOLDER}")
     print("[STARTUP] Serial Message Queue: 100 messages max")
     print("[STARTUP] CSV logging: Now includes sensor NAMES (not just IDs) AND heater thermistor!")
     print("[STARTUP] Heater thermistor source: /tmp/heater_thermistor.json")
     print("[STARTUP] Probe management: Includes DELETE functionality!")
-    print("[STARTUP] Parser: Accepts hex sensor IDs (8+ chars) with colon, space, or comma separator")
     Path(LOG_FOLDER).mkdir(parents=True, exist_ok=True)
 
     reader = SerialReaderThread(serial_handler, data_manager, state_machine, logger, serial_message_queue, heater_reader)
