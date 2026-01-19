@@ -32,12 +32,13 @@ class HeaterThermistorReader:
 		self.last_temp = None
 		self.last_state = None
 		self.last_timestamp = None
+		self.last_pid_output = None
 		self.lock = threading.Lock()
 	
 	def get_temperature(self):
 		"""
 		Read latest heater thermistor temperature AND STATE
-		Returns: dict with 'temperature', 'heater_state', and 'status', or None if unavailable
+		Returns: dict with 'temperature', 'heater_state','pid_output' and 'status', or None if unavailable
 		"""
 		with self.lock:
 			try:
@@ -46,14 +47,17 @@ class HeaterThermistorReader:
 						data = json.load(f)
 						temp = data.get('temperature_c')
 						state = data.get('heater_state', 'Unknown')  # Default to Unknown if missing
-						
+						pid_output = data.get('pid_output')  # New: Read PID output
+                        
 						if temp is not None:
 							self.last_temp = temp
 							self.last_state = state
+							self.last_pid_output = pid_output
 							self.last_timestamp = time.time()
 							return {
 								'temperature': temp,
 								'heater_state': state,
+                                'pid_output': pid_output,
 								'status': 'online'
 							}
 				
@@ -62,6 +66,7 @@ class HeaterThermistorReader:
 					return {
 						'temperature': self.last_temp,
 						'heater_state': self.last_state,
+						'pid_output': self.last_pid_output,
 						'status': 'cached'
 					}
 				return None
@@ -395,6 +400,7 @@ class DataLogger:
 				# Add heater thermistor columns (temperature and state)
 				header_parts.append("Heater Thermistor (°C)")
 				header_parts.append("Heater State")
+				header_parts.append("PID Output") 
 				
 				header = ",".join(header_parts)
 				self.current_handle.write(header + "\n")
@@ -410,7 +416,7 @@ class DataLogger:
 				print(f"[LOGGER] Error starting session: {e}")
 				return None
 	
-	def log_reading(self, sensors_dict, heater_temp=None, heater_state=None):
+	def log_reading(self, sensors_dict, heater_temp=None, heater_state=None, pid_output=None):
 		"""Log current sensor readings plus heater temperature and state"""
 		with self.lock:
 			if not self.current_handle:
@@ -442,7 +448,13 @@ class DataLogger:
 				else:
 					state_value = "NC"
 				row += f",{state_value}"
-				
+				# Log PID output
+				if pid_output is not None:
+					pid_value = f"{pid_output:.3f}"
+				else:
+					pid_value = "NC"
+				row += f",{pid_value}"
+
 				self.current_handle.write(row + "\n")
 				self.current_handle.flush()
 				
@@ -602,12 +614,14 @@ class SerialReaderThread(threading.Thread):
 								if self.state_machine.logging_state == LoggingState.LOGGING:
 									heater_temp = None
 									heater_state = None
+									pid_output = None
 									heater_data = self.heater_reader.get_temperature()
 									if heater_data:
 										heater_temp = heater_data['temperature']
 										heater_state = heater_data.get('heater_state', 'Unknown')
+										pid_output = heater_data.get('pid_output')
 									
-									self.logger.log_reading(self.data_manager.get_sensors(), heater_temp, heater_state)
+									self.logger.log_reading(self.data_manager.get_sensors(), heater_temp, heater_state, pid_output)
 							
 							except ValueError:
 								msg = f"Invalid temperature value: {temp_str}"
@@ -695,13 +709,15 @@ class LoggingThread(threading.Thread):
 				if sensors:
 					heater_temp = None
 					heater_state = None
+					pid_output = None
 					heater_data = self.heater_reader.get_temperature()
 					if heater_data:
 						heater_temp = heater_data['temperature']
 						heater_state = heater_data.get('heater_state', 'Unknown')
-					
-					self.logger.log_reading(sensors, heater_temp, heater_state)
-				
+						pid_output = heater_data.get('pid_output')  # New: Read PID output
+
+					self.logger.log_reading(sensors, heater_temp, heater_state, pid_output)
+
 				last_log = current_time
 			
 			time.sleep(0.5)
