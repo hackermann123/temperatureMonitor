@@ -444,7 +444,7 @@
                 <div id="loggingControls">
                     <div class="form-group">
                         <label for="logFolder">Log Folder (optional)</label>
-                        <input type="text" id="logFolder" placeholder="/home/pi/temperature_logs">
+                        <input type="text" id="logFolder" placeholder="/home/vbio/GC_Test/temperatureMonitor/RPi/temperature_logs">
                     </div>
 
                     <div class="form-group">
@@ -866,7 +866,7 @@
 
         async function startLogging() {
             try {
-                const folder = document.getElementById("logFolder").value || "/home/pi/temperature_logs";
+                const folder = document.getElementById("logFolder").value || "/home/vbio/GC_Test/temperatureMonitor/RPi/temperature_logs";
                 const durationVal = parseInt(document.getElementById("logDuration").value, 10);
                 const duration = durationVal > 0 ? durationVal : null;
                 const intervalVal = parseInt(document.getElementById("logInterval").value, 10);

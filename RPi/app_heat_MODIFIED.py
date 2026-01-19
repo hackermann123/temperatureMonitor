@@ -17,6 +17,10 @@ from functools import wraps
 # ============================================================================
 # HEATER THERMISTOR READER (MODIFIED TO INCLUDE STATE)
 # ============================================================================
+# Config
+SERIAL_PORT = "/dev/ttyACM0"
+SERIAL_BAUDRATE = 9600
+LOG_FOLDER = "/home/vbio/GC_Test/temperatureMonitor/RPi/temperature_logs"
 
 class HeaterThermistorReader:
 	"""
@@ -359,7 +363,7 @@ class DataLogger:
 	Handles CSV file creation and data logging with proper timestamps.
 	NOW INCLUDES HEATER THERMISTOR TEMPERATURE AND STATE IN CSV!
 	"""
-	def __init__(self, folder="/home/vbio/TemperatureMonitor/temperatureMonitor/RPi/logs/"):
+	def __init__(self, folder=LOG_FOLDER):
 		self.folder = Path(folder)
 		self.folder.mkdir(parents=True, exist_ok=True)
 		self.current_file = None
@@ -724,10 +728,7 @@ heater_reader = HeaterThermistorReader()
 # Global logging thread
 logging_thread = None
 
-# Config
-SERIAL_PORT = "/dev/ttyACM0"
-SERIAL_BAUDRATE = 9600
-LOG_FOLDER = "/home/vbio/TemperatureMonitor/temperatureMonitor/RPi/logs/"
+
 
 # ============================================================================
 # ROUTES - API ENDPOINTS
