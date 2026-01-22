@@ -16,19 +16,27 @@ PID_COL = 9
 
 def load_data(csv_path: str) -> pd.DataFrame:
     """
-    Load CSV without header, assign sensible column names,
-    and parse timestamp into datetime.
+    Load CSV with header row, parse timestamp into datetime.
     """
-    col_names = (
-        ["time"]
-        + [f"probe_{i+1}" for i in range(len(PROBE_COLS))]
-        + ["thermistor", "relay", "pid_output"]
-    )
+    # Read CSV with header (skip=0 is default)
+    df = pd.read_csv(csv_path)
 
-    df = pd.read_csv(csv_path, header=None, names=col_names)
+    # Parse time column (handles various timestamp formats)
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], format='mixed', utc=False)
 
-    # Parse time column
-    df["time"] = pd.to_datetime(df["time"])
+    # Rename columns for consistency
+    df = df.rename(columns={
+        "Timestamp": "time",
+        "Probe 11": "probe_1",
+        "Probe 13": "probe_2",
+        "Probe 22": "probe_3",
+        "Probe 21": "probe_4",
+        "Probe 12": "probe_5",
+        "Probe 23": "probe_6",
+        "Heater Thermistor": "thermistor",
+        "Heater Relay": "relay",
+        "PID Output": "pid_output"
+    })
 
     # Map relay On/Off to 1/0 for plotting
     df["relay_state"] = df["relay"].map({"On": 1, "Off": 0})
@@ -59,7 +67,7 @@ def plot_graphs(df: pd.DataFrame, save_prefix: str = "temperature_plots"):
         "tab:brown",
     ]
 
-    for i, col_idx in enumerate(PROBE_COLS):
+    for i in range(6):
         col_name = f"probe_{i+1}"
         ax1.plot(
             x,
@@ -73,7 +81,7 @@ def plot_graphs(df: pd.DataFrame, save_prefix: str = "temperature_plots"):
     ax1.plot(
         x,
         df["thermistor"],
-        label="Thermistor",
+        label="Heater Thermistor",
         color="black",
         linewidth=1.5,
         linestyle="--",
@@ -165,11 +173,15 @@ def main():
         sys.exit(1)
 
     print(f"📂 Loading: {csv_path.name}")
-    df = load_data(str(csv_path))
-    print(f"✓ Loaded {len(df)} data points\n")
-    
-    print("📊 Generating graphs...")
-    plot_graphs(df)
+    try:
+        df = load_data(str(csv_path))
+        print(f"✓ Loaded {len(df)} data points\n")
+        
+        print("📊 Generating graphs...")
+        plot_graphs(df)
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
