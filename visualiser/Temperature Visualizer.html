@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Data Visualizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --color-primary: #2180CD;
+            --color-primary-hover: #1a6bb8;
+            --color-background: #f5f5f5;
+            --color-surface: #ffffff;
+            --color-text: #1a1a1a;
+            --color-text-secondary: #666;
+            --color-border: #ddd;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-text);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--color-text-secondary);
+            font-size: 14px;
+        }
+
+        .upload-section {
+            background-color: var(--color-surface);
+            border: 2px dashed var(--color-border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .file-input-wrapper {
+            display: inline-block;
+            position: relative;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-btn {
+            background-color: var(--color-primary);
+            color: white;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .upload-btn:hover {
+            background-color: var(--color-primary-hover);
+        }
+
+        .upload-btn:active {
+            transform: scale(0.98);
+        }
+
+        .file-name {
+            color: var(--color-text-secondary);
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .charts-section {
+            display: none;
+        }
+
+        .charts-section.visible {
+            display: block;
+        }
+
+        .chart-container {
+            background-color: var(--color-surface);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--color-text);
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin-bottom: 15px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .save-btn {
+            background-color: #27ae60;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .save-btn:hover {
+            background-color: #229954;
+        }
+
+        .error-message {
+            background-color: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.visible {
+            display: block;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: #f9f9f9;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid var(--color-primary);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌡️ Temperature Data Visualizer</h1>
+            <p>Upload your CSV file to visualize temperature probe data</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="upload-section">
+            <div class="file-input-wrapper">
+                <input type="file" id="csvFile" accept=".csv" />
+                <button class="upload-btn" onclick="document.getElementById('csvFile').click();">
+                    📁 Choose CSV File
+                </button>
+                <div class="file-name" id="fileName"></div>
+            </div>
+        </div>
+
+        <div class="charts-section" id="chartsSection">
+            <div class="stats" id="stats"></div>
+
+            <div class="chart-container">
+                <div class="chart-title">Graph 1: Temperature Probes & Thermistor vs Time</div>
+                <div class="chart-wrapper">
+                    <canvas id="chart1"></canvas>
+                </div>
+                <div class="controls">
+                    <button class="save-btn" onclick="saveChart('chart1', 'temperature_probes.jpg')">
+                        💾 Save Graph 1 as JPG
+                    </button>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">Graph 2: Thermistor, Heater State & PID Output vs Time</div>
+                <div class="chart-wrapper">
+                    <canvas id="chart2"></canvas>
+                </div>
+                <div class="controls">
+                    <button class="save-btn" onclick="saveChart('chart2', 'thermistor_heater_pid.jpg')">
+                        💾 Save Graph 2 as JPG
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script>
+        let chart1 = null;
+        let chart2 = null;
+
+        // Define distinct colors for each probe
+        const probeColors = {
+            '11': '#FF6B6B',
+            '13': '#4ECDC4',
+            '22': '#45B7D1',
+            '21': '#FFA07A',
+            '12': '#98D8C8',
+            '23': '#F7DC6F'
+        };
+
+        document.getElementById('csvFile').addEventListener('change', handleFileUpload);
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').textContent = `File: ${file.name}`;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const csv = e.target.result;
+                    const data = parseCSV(csv);
+                    displayCharts(data);
+                    displayStats(data);
+                    document.getElementById('errorMessage').classList.remove('visible');
+                } catch (error) {
+                    showError(`Error parsing CSV: ${error.message}`);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const headers = lines[0].split(',');
+            const data = {
+                timestamps: [],
+                probes: {},
+                thermistor: [],
+                heaterState: [],
+                pidOutput: []
+            };
+
+            // Initialize probe arrays
+            ['11', '13', '22', '21', '12', '23'].forEach(probe => {
+                data.probes[probe] = [];
+            });
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                if (values.length !== headers.length) continue;
+
+                // Parse timestamp and convert to readable format
+                const timestamp = new Date(values[0]);
+                const timeStr = timestamp.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit' 
+                });
+                data.timestamps.push(timeStr);
+
+                // Parse probe temperatures
+                data.probes['11'].push(parseFloat(values[1]));
+                data.probes['13'].push(parseFloat(values[2]));
+                data.probes['22'].push(parseFloat(values[3]));
+                data.probes['21'].push(parseFloat(values[4]));
+                data.probes['12'].push(parseFloat(values[5]));
+                data.probes['23'].push(parseFloat(values[6]));
+
+                // Parse thermistor, heater state, and PID output
+                data.thermistor.push(parseFloat(values[7]));
+                data.heaterState.push(values[8] === 'On' ? 1 : 0);
+                data.pidOutput.push(parseFloat(values[9]));
+            }
+
+            return data;
+        }
+
+        function displayCharts(data) {
+            // Chart 1: Temperature Probes & Thermistor
+            createChart1(data);
+
+            // Chart 2: Thermistor, Heater State & PID Output
+            createChart2(data);
+
+            document.getElementById('chartsSection').classList.add('visible');
+        }
+
+        function createChart1(data) {
+            const ctx = document.getElementById('chart1').getContext('2d');
+
+            const datasets = [];
+
+            // Add probe datasets
+            ['11', '13', '22', '21', '12', '23'].forEach(probe => {
+                datasets.push({
+                    label: `Probe ${probe}`,
+                    data: data.probes[probe],
+                    borderColor: probeColors[probe],
+                    backgroundColor: probeColors[probe] + '20',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 5
+                });
+            });
+
+            // Add thermistor dataset
+            datasets.push({
+                label: 'Heater Thermistor',
+                data: data.thermistor,
+                borderColor: '#9B59B6',
+                backgroundColor: '#9B59B6' + '20',
+                borderWidth: 3,
+                tension: 0.3,
+                fill: false,
+                pointRadius: 0,
+                pointHoverRadius: 5
+            });
+
+            if (chart1) chart1.destroy();
+
+            chart1 = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.timestamps,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                boxWidth: 12,
+                                font: { size: 11 },
+                                padding: 10
+                            }
+                        },
+                        title: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            ticks: {
+                                maxTicksLimit: 15,
+                                font: { size: 10 }
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            ticks: {
+                                font: { size: 10 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createChart2(data) {
+            const ctx = document.getElementById('chart2').getContext('2d');
+
+            if (chart2) chart2.destroy();
+
+            chart2 = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.timestamps,
+                    datasets: [
+                        {
+                            label: 'Heater Thermistor (°C)',
+                            data: data.thermistor,
+                            borderColor: '#E74C3C',
+                            backgroundColor: '#E74C3C' + '20',
+                            borderWidth: 2.5,
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 0,
+                            pointHoverRadius: 5,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Heater State (On/Off)',
+                            data: data.heaterState,
+                            borderColor: '#3498DB',
+                            backgroundColor: '#3498DB' + '40',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            fill: true,
+                            pointRadius: 0,
+                            pointHoverRadius: 5,
+                            yAxisID: 'y1',
+                            stepped: 'before'
+                        },
+                        {
+                            label: 'PID Output',
+                            data: data.pidOutput,
+                            borderColor: '#27AE60',
+                            backgroundColor: '#27AE60' + '20',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 0,
+                            pointHoverRadius: 5,
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                boxWidth: 12,
+                                font: { size: 11 },
+                                padding: 10
+                            }
+                        },
+                        title: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            ticks: {
+                                maxTicksLimit: 15,
+                                font: { size: 10 }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            ticks: {
+                                font: { size: 10 }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Heater State (0=Off, 1=On)',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            min: -0.2,
+                            max: 1.2,
+                            ticks: {
+                                font: { size: 10 },
+                                stepSize: 1
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            offset: true,
+                            title: {
+                                display: true,
+                                text: 'PID Output (0.0 - 1.0)',
+                                font: { size: 12, weight: 'bold' }
+                            },
+                            ticks: {
+                                font: { size: 10 }
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayStats(data) {
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-label">Data Points</div>
+                    <div class="stat-value">${data.timestamps.length}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Thermistor Min</div>
+                    <div class="stat-value">${Math.min(...data.thermistor).toFixed(2)}°C</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Thermistor Max</div>
+                    <div class="stat-value">${Math.max(...data.thermistor).toFixed(2)}°C</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Thermistor Avg</div>
+                    <div class="stat-value">${(data.thermistor.reduce((a, b) => a + b) / data.thermistor.length).toFixed(2)}°C</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg PID Output</div>
+                    <div class="stat-value">${(data.pidOutput.reduce((a, b) => a + b) / data.pidOutput.length).toFixed(3)}</div>
+                </div>
+            `;
+            document.getElementById('stats').innerHTML = statsHtml;
+        }
+
+        function saveChart(chartId, filename) {
+            const chartCanvas = document.getElementById(chartId);
+            html2canvas(chartCanvas.parentElement, {
+                scale: 2,
+                backgroundColor: '#ffffff'
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.download = filename;
+                link.click();
+            });
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('visible');
+        }
+    </script>
+</body>
+</html>
